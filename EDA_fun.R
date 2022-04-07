@@ -84,7 +84,7 @@ hist(mean_toangle$mean)
 # take a look at vGRF:
 # Beacuse from the info session, kerry mentioned that if the curve is flat or has extremely sharp turn, the participant might have some injure on his/her knee
 # We plot the proportion of vGRF_valley to the mean of two peaks:
-peak_valley <- ID_discrete %>% select(c(1:4, 16:23))
+peak_valley <- ID_discrete %>% select(c(1:4, 10, 16:23))
 peak_valley_mean <- peak_valley %>%  group_by(ID,TRIAL) %>% summarise_at(vars(vGRF_peak1:mlGRF_peak3), mean) %>% 
   mutate(vGRF_valley_perc = vGRF_valley/((vGRF_peak1 + vGRF_peak2)/2))
 
@@ -93,6 +93,8 @@ peak_valley_mean <- peak_valley %>%  group_by(ID,TRIAL) %>% summarise_at(vars(vG
 hist(peak_valley_mean$vGRF_valley_perc,
      main="vGRF_valley / average vGRF_peaks",
      xlab="Proportion")
+
+
 
 # rbind ID_info and discrete
 
@@ -134,14 +136,14 @@ library(ggbiplot)
 ggbiplot(discrete.pca, 
          alpha =0.5, 
          choices = c(1,2),
-         varname.adjust = 4, 
+         varname.adjust = 2.5, 
          circle = TRUE,
          obs.scale = 1, 
          var.scale = 1,
          ellipse = TRUE,
          var.axes = T)+
-  xlim(-15,25)+
-  ylim(-10,25)
+  xlim(-20,25)+
+  ylim(-20,25)
 
 
 # Clean for time series data COPx:
@@ -295,4 +297,3 @@ time_series_COPy_plot_total <- function(df){
 
 time_series_COPx_plot_total(COPx_stance_ts)
 time_series_COPy_plot_total(COPy_stance_ts)
-
