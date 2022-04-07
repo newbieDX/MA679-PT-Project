@@ -7,26 +7,26 @@ library(timeSeries)
 
 
 # Manually extracted GRF and COP features
-discrete <- read_excel("~/Desktop/PT/PTProject_Data/discrete.xls")
-ID_info <- read_excel("~/Desktop/PT/PTProject_Data/IDinfo.xls")
+discrete <- read_excel("/Users/xuchen/Desktop/MA679/PTProject_Data/discrete.xls")
+ID_info <- read_excel("/Users/xuchen/Desktop/MA679/PTProject_Data/IDinfo.xls")
 
 
 # Time series data
-GRFx <- read.csv("~/Desktop/PT/PTProject_Data/GRFx.csv", header = F)
-GRFy <- read.csv("~/Desktop/PT/PTProject_Data/GRFy.csv", header = F)
-GRFz <- read.csv("~/Desktop/PT/PTProject_Data/GRFz.csv", header = F)
-COPy <- read.csv("~/Desktop/PT/PTProject_Data/COPy.csv", header = F)
-COPx <- read.csv("~/Desktop/PT/PTProject_Data/COPx.csv", header = F)
-Mx <- read.csv("~/Desktop/PT/PTProject_Data/Mx.csv", header = F)
-My <- read.csv("~/Desktop/PT/PTProject_Data/My.csv", header = F)
-Mz <- read.csv("~/Desktop/PT/PTProject_Data/Mz.csv", header = F)
+GRFx <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/GRFx.csv", header = F)
+GRFy <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/GRFy.csv", header = F)
+GRFz <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/GRFz.csv", header = F)
+COPy <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/COPy.csv", header = F)
+COPx <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/COPx.csv", header = F)
+Mx <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/Mx.csv", header = F)
+My <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/My.csv", header = F)
+Mz <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/Mz.csv", header = F)
 
 # Time-normalized data
-AP_GRF_stance_N <- read.csv("~/Desktop/PT/PTProject_Data/AP_GRF_stance_N.csv", header = F)
-ML_GRF_stance_N <- read.csv("~/Desktop/PT/PTProject_Data/ML_GRF_stance_N.csv", header = F)
-V_GRF_stance_N <- read.csv("~/Desktop/PT/PTProject_Data/V_GRF_stance_N.csv", header = F)
-COPx_stance <- read.csv("~/Desktop/PT/PTProject_Data/COPx_stance.csv", header = F)
-COPy_stance <- read.csv("~/Desktop/PT/PTProject_Data/COPy_stance.csv", header = F)
+AP_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/AP_GRF_stance_N.csv", header = F)
+ML_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/ML_GRF_stance_N.csv", header = F)
+V_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/V_GRF_stance_N.csv", header = F)
+COPx_stance <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/COPx_stance.csv", header = F)
+COPy_stance <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/COPy_stance.csv", header = F)
 
 # EDA:
 # ID_info
@@ -69,7 +69,27 @@ sd_discrete
 
 summary(discrete)
 
+# take a look at TO-angle:
+mean_toangle <- ID_discrete %>% group_by(ID,TRIAL) %>% summarise(mean = mean(TO_angle))
+hist(mean_toangle$mean)
 
+succes_trial <- as.data.frame(table(ID_info$ID, ID_info$TRIAL)) %>% 
+  pivot_wider(names_from = Var2, values_from = Freq) %>% 
+  mutate(nr_success = rowSums(across(where(is.numeric)))) %>%
+  mutate(success_prop = round(nr_success/10, 2))
+
+hist(succes_trial$success_prop)
+
+ggplot(succes_trial, aes(x = success_prop))+
+  geom_bar(stat = "count", position = "dodge")+
+  ggtitle("Success proportion of 10 trials for each participant")
+
+# take a look at vGRF:
+
+peak_vally <- ID_discrete %>% select(c(1:4, 16:23))
+peak_vally_mean <- peak_vally %>%  group_by(ID,TRIAL) %>% summarise_at(vars(vGRF_peak1:mlGRF_peak3), mean)
+
+hist(peak_vally_mean$vGRF_peak1)
 
 # According to the df we have stores the value of standard deviation for each value for discrete df, we can find out that
 # vGRF_iLR_max  vGRF_iULR_max vGRF_avgLR    vGRF_avgULR
