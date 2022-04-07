@@ -198,17 +198,17 @@ data_wrangle_COPy <- function(df, id){
 # ggplot
 
 time_series_mock_plot_COPx <- function(df){
-  ggplot(df, aes(x = t, y = COPx, color = TRIAL))+
+  ggplot(df, aes(x = t, y = COPx, color = new))+
     geom_line()+
-    facet_grid(~KNEE)+
+    # facet_grid(~KNEE)+
     theme(legend.position = "none",
           axis.text.x=element_blank())
 }
 
 time_series_mock_plot_COPy <- function(df){
-  ggplot(df, aes(x = t, y = COPy, color = TRIAL))+
+  ggplot(df, aes(x = t, y = COPy, color = new))+
     geom_line()+
-    facet_grid(~KNEE)+
+    # facet_grid(~KNEE)+
     theme(legend.position = "none",
           axis.text.x=element_blank())
 }
@@ -256,8 +256,26 @@ ID_COPx_stance <- cbind(ID_info, COPx_stance)
 ID_COPy_stance <- cbind(ID_info, COPy_stance)
 
 
+data_wrangle_COPx_stance_total <- function(df){
+  df_1 <- df %>% pivot_longer(-c(ID, KNEE, TRIAL, tr_length), names_to = "data_point", values_to = "COPx")
+  df_1$data_point <- gsub('^.', '', df_1$data_point)
+  df_1$TRIAL <- as.character(df_1$TRIAL)
+  df_mock <- left_join(df_1, data_2, by = c("data_point")) %>%
+    mutate(new = paste(ID, "-",KNEE, "-",TRIAL))
+  return(df_mock)
+}
+
 data_wrangle_COPx_total <- function(df){
   df_1 <- df %>% pivot_longer(-c(ID, KNEE, TRIAL, tr_length), names_to = "data_point", values_to = "COPx")
+  df_1$data_point <- gsub('^.', '', df_1$data_point)
+  df_1$TRIAL <- as.character(df_1$TRIAL)
+  df_mock <- left_join(df_1, data, by = c("data_point")) %>%
+    mutate(new = paste(ID, "-",KNEE, "-",TRIAL))
+  return(df_mock)
+}
+
+data_wrangle_COPy_stance_total <- function(df){
+  df_1 <- df %>% pivot_longer(-c(ID, KNEE, TRIAL, tr_length), names_to = "data_point", values_to = "COPy")
   df_1$data_point <- gsub('^.', '', df_1$data_point)
   df_1$TRIAL <- as.character(df_1$TRIAL)
   df_mock <- left_join(df_1, data_2, by = c("data_point")) %>%
@@ -269,19 +287,20 @@ data_wrangle_COPy_total <- function(df){
   df_1 <- df %>% pivot_longer(-c(ID, KNEE, TRIAL, tr_length), names_to = "data_point", values_to = "COPy")
   df_1$data_point <- gsub('^.', '', df_1$data_point)
   df_1$TRIAL <- as.character(df_1$TRIAL)
-  df_mock <- left_join(df_1, data_2, by = c("data_point")) %>%
+  df_mock <- left_join(df_1, data, by = c("data_point")) %>%
     mutate(new = paste(ID, "-",KNEE, "-",TRIAL))
   return(df_mock)
 }
 
-
-COPx_stance_ts <- data_wrangle_COPx_total(ID_COPx_stance)
-COPy_stance_ts <- data_wrangle_COPy_total(ID_COPy_stance)
+COPx_ts <- data_wrangle_COPx_total(head(ID_COPx, 250))
+COPy_ts <- data_wrangle_COPy_total(head(ID_COPy, 250))
+COPx_stance_ts <- data_wrangle_COPx_stance_total(head(ID_COPx_stance, 250))
+COPy_stance_ts <- data_wrangle_COPy_stance_total(head(ID_COPy_stance,250))
 
 time_series_COPx_plot_total <- function(df){
   ggplot(df, aes(x = t_2, y = COPx, color = new))+
     geom_line()+
-    facet_wrap(~KNEE)+
+    # facet_wrap(~KNEE)+
     theme(legend.position = "none",
           axis.text.x=element_blank())
 }
@@ -289,11 +308,12 @@ time_series_COPx_plot_total <- function(df){
 time_series_COPy_plot_total <- function(df){
   ggplot(df, aes(x = t_2, y = COPy, color = new))+
     geom_line()+
-    facet_wrap(~KNEE)+
+    # facet_wrap(~KNEE)+
     theme(legend.position = "none",
           axis.text.x=element_blank())
 }
 
-
-time_series_COPx_plot_total(COPx_stance_ts)
-time_series_COPy_plot_total(COPy_stance_ts)
+time_series_mock_plot_COPx(COPx_ts)+ggtitle("First 250 participants COPx plot")
+time_series_mock_plot_COPy(COPy_ts)+ggtitle("First 250 participants COPy plot")
+time_series_COPx_plot_total(COPx_stance_ts)+ggtitle("First 250 participants time-normalized COPx plot")
+time_series_COPy_plot_total(COPy_stance_ts)+ggtitle("First 250 participants time-normalized COPy plot")
