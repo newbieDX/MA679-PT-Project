@@ -33,12 +33,20 @@ COPy_stance <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/COPy_stance.
 median_trlength <- ID_info %>% group_by(KNEE) %>% summarise(median = median(tr_length))
 mean_trlength <- ID_info %>% group_by(KNEE) %>% summarise(mean = mean(tr_length))
 
+# First, we took look at the trial length distribution for different knees 
+# to see if there exits some significant difference between each knee.
+# The two vertical lines are median trial length for different knee:
+
 trial_length <- ggplot(ID_info, aes(x = tr_length, fill = KNEE))+
   geom_density(alpha = 0.5,adjust = 0.3)+
   geom_vline(data = median_trlength, aes(xintercept = median, color = KNEE), size=1)+
   labs(x= "Trial length",
        subtitle="Trial length distribution for different knee")+
   theme(legend.position="bottom")
+
+trial_length
+
+# We also plot bar plot to check the distribution of trial number for different knees
 
 trial_var <- ggplot(ID_info, aes(x = TRIAL, fill = KNEE))+
   geom_bar(stat = "count", position = "dodge")+
@@ -48,10 +56,49 @@ trial_var <- ggplot(ID_info, aes(x = TRIAL, fill = KNEE))+
 trial_var
 
 
+# As we can see, there is no big significant different between two knees, we plan to check the success trial number proportion
+# The total number of trial we select is 10:
+
+succes_trial <- as.data.frame(table(ID_info$ID, ID_info$TRIAL)) %>% 
+  pivot_wider(names_from = Var2, values_from = Freq) %>% 
+  mutate(nr_success = rowSums(across(where(is.numeric)))) %>%
+  mutate(success_prop = round(nr_success/10, 2))
+
+# We can see that majority participants finish more than 5 trial combine with right and left knee. 
+# This could be a potential feature to determine if the participant has some injures on his/her knee
+
+ggplot(succes_trial, aes(x = success_prop))+
+  geom_bar(stat = "count", position = "dodge")+
+  ggtitle("Success proportion of 10 trials for each participant")
+
+
+# For the features in the discrete df, we plan to look into TO-angle and vGRF first:
+# take a look at TO-angle, we summarize an average TO-angle per knee for each participant group by ID and Trial.
+mean_toangle <- ID_discrete %>% group_by(ID,TRIAL) %>% summarise(mean = mean(TO_angle))
+
+# From the distribution of TO-angle, we can see it is almost normal distribution.
+hist(mean_toangle$mean)
+
+
+
+# take a look at vGRF:
+# Beacuse from the info session, kerry mentioned that if the curve is flat or has extremely sharp turn, the participant might have some injure on his/her knee
+# We plot the proportion of vGRF_valley to the mean of two peaks:
+peak_valley <- ID_discrete %>% select(c(1:4, 16:23))
+peak_valley_mean <- peak_valley %>%  group_by(ID,TRIAL) %>% summarise_at(vars(vGRF_peak1:mlGRF_peak3), mean) %>% 
+  mutate(vGRF_valley_perc = vGRF_valley/((vGRF_peak1 + vGRF_peak2)/2))
+
+# From the distribution, we can see there exists some flat(proportion > 0.9?) and some has extremely sharp turn(proportion < 0.6?). 
+# But need more info like normal range to interpret.
+hist(peak_valley_mean$vGRF_valley_perc,
+     main="vGRF_valley / average vGRF_peaks",
+     xlab="Proportion")
 
 # rbind ID_info and discrete
 
 ID_discrete <- cbind(ID_info, discrete)
+
+# The next step we look into the standard deviation for each feature in discrete
 
 sd_discrete <- as.data.frame(as.table(apply(discrete,2,sd)))
 
@@ -69,53 +116,11 @@ sd_discrete
 
 summary(discrete)
 
-# take a look at TO-angle:
-mean_toangle <- ID_discrete %>% group_by(ID,TRIAL) %>% summarise(mean = mean(TO_angle))
-hist(mean_toangle$mean)
-
-succes_trial <- as.data.frame(table(ID_info$ID, ID_info$TRIAL)) %>% 
-  pivot_wider(names_from = Var2, values_from = Freq) %>% 
-  mutate(nr_success = rowSums(across(where(is.numeric)))) %>%
-  mutate(success_prop = round(nr_success/10, 2))
-
-hist(succes_trial$success_prop)
-
-ggplot(succes_trial, aes(x = success_prop))+
-  geom_bar(stat = "count", position = "dodge")+
-  ggtitle("Success proportion of 10 trials for each participant")
-
-# take a look at vGRF:
-
-peak_vally <- ID_discrete %>% select(c(1:4, 16:23))
-peak_vally_mean <- peak_vally %>%  group_by(ID,TRIAL) %>% summarise_at(vars(vGRF_peak1:mlGRF_peak3), mean)
-
-hist(peak_vally_mean$vGRF_peak1)
-
 # According to the df we have stores the value of standard deviation for each value for discrete df, we can find out that
 # vGRF_iLR_max  vGRF_iULR_max vGRF_avgLR    vGRF_avgULR
 # These four features have relatively high sd
-# So we decide to see the distribution for there four features according to each knee
 
-median_vGRF_iLR_max <- ID_discrete %>% group_by(KNEE) %>% summarise(median = median(vGRF_iLR_max))
-mean_vGRF_iLR_max <- ID_discrete %>% group_by(KNEE) %>% summarise(mean = mean(vGRF_iLR_max))
-
-ggplot(ID_discrete, aes(y = ID, x = vGRF_iLR_max))+
-  geom_point()
-# geom_vline(data = median_vGRF_iLR_max, aes(xintercept = median, color = KNEE), size=1)+
-# labs(x= "vGRF_iLR_max",
-#      subtitle="vGRF_iLR_max distribution for different knee")+
-# theme(legend.position="bottom")
-
-ggplot(ID_discrete, aes(x = vGRF_iULR_max, y = ID))+
-  geom_point()
-# geom_vline(data = median_vGRF_iLR_max, aes(xintercept = median, color = KNEE), size=1)+
-# labs(x= "vGRF_iLR_max",
-#      subtitle="vGRF_iLR_max distribution for different knee")+
-# theme(legend.position="bottom")
-
-# From the sd df, we can know that 
-
-
+# Then we select 7 features to generate a PCA
 #PCA on discrete:
 discrete.pca <- prcomp(ID_discrete[,c(12:18)], center = TRUE,scale. = TRUE)
 summary(discrete.pca)
