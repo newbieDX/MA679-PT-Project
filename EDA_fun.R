@@ -124,26 +124,18 @@ summary(discrete)
 
 # Then we select 7 features to generate a PCA
 #PCA on discrete:
-discrete.pca <- prcomp(ID_discrete[,c(12:18)], center = TRUE,scale. = TRUE)
+discrete.pca <- prcomp(ID_discrete[,c(4:33)], center = TRUE,scale. = TRUE)
 summary(discrete.pca)
 
 
 library(devtools)
-# install_github("vqv/ggbiplot")
+install_github("vqv/ggbiplot")
 
-library(ggbiplot)
+library(ggfortify)
 
-ggbiplot(discrete.pca, 
-         alpha =0.5, 
-         choices = c(1,2),
-         varname.adjust = 2.5, 
-         circle = TRUE,
-         obs.scale = 1, 
-         var.scale = 1,
-         ellipse = TRUE,
-         var.axes = T)+
-  xlim(-20,25)+
-  ylim(-20,25)
+autoplot(discrete.pca,
+         loadings = TRUE, loadings.colour = 'blue',
+         loadings.label = TRUE, loadings.label.size = 3)
 
 
 # Clean for time series data COPx:
