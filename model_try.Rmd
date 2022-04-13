@@ -17,6 +17,10 @@ Data wrangle, preparation and visualization:
 
 ```{r}
 ID_AP_GRF_stance_N <- cbind(ID_info, AP_GRF_stance_N)
+ID_ML_GRF_stance_N <- cbind(ID_info, ML_GRF_stance_N)
+ID_V_GRF_stance_N <- cbind(ID_info, V_GRF_stance_N)
+ID_COPx_stance <- cbind(ID_info, COPx_stance)
+ID_COPy_stance <- cbind(ID_info, COPy_stance)
 
 data_pre_func <- function(df){ 
   df1<- df %>% pivot_longer(-c(ID, KNEE, TRIAL, tr_length), names_to = "time", values_to = "force") %>% 
@@ -29,6 +33,10 @@ data_pre_func <- function(df){
 }
 
 try <- data_pre_func(ID_AP_GRF_stance_N)
+try2 <- data_pre_func(ID_ML_GRF_stance_N)
+try3 <- data_pre_func(ID_V_GRF_stance_N)
+try4 <- data_pre_func(ID_COPx_stance)
+try5 <- data_pre_func(ID_COPy_stance)
 
 # p_try <- ggplot(try, aes(x = t, y = force, group = new, col = new)) +
 #   geom_line()
