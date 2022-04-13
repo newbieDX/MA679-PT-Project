@@ -30,21 +30,21 @@ data_pre_func <- function(df){
 
 try <- data_pre_func(ID_AP_GRF_stance_N)
 
-p_try <- ggplot(try, aes(x = t, y = force, group = new, col = new)) +
-  geom_line()
-p_try
+# p_try <- ggplot(try, aes(x = t, y = force, group = new, col = new)) +
+#   geom_line()
+# p_try
 ```
 
 Prepare data for FPCA:
 ```{r}
-L_try <- MakeFPCAInputs(b$ID, b$t, b$force)
+L_try <- MakeFPCAInputs(try$new, try$t, try$force)
 FPCAdense <- FPCA(L_try$Ly, L_try$Lt)
 
 # Plot the FPCA object
 plot(FPCAdense)
 ```
 
-Based on the scree-plot we see that the first three components appear to encapsulate most of the relevant variation. The number of eigen components to reach a 99% FVE is 13 but just 7 eigen components are enough to reach a 95.0%.
+Based on the scree-plot we see that the first three components appear to encapsulate most of the relevant variation. The number of eigen components to reach a 99% FVE is 12 but just 7 eigen components are enough to reach a 95.0%.
 
 ```{r}
 SelectK(FPCAdense, criterion = 'FVE', FVEthreshold = 0.95)
@@ -55,7 +55,7 @@ SelectK(FPCAdense, criterion = 'FVE', FVEthreshold = 0.99)
 library(ks)
 
 par(mfrow=c(1,2))
-  CreatePathPlot(FPCAdense, subset = c(3,5,135), main = 'K = 13', pch = 4); grid()
+  CreatePathPlot(FPCAdense, subset = c(3,5,135), K = 12, main = 'K = 12', pch = 4); grid()
   CreatePathPlot(FPCAdense, subset = c(3,5,135), K = 7, main = 'K = 7', pch = 4) ; grid()
 ```
 
