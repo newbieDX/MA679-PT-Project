@@ -31,6 +31,30 @@ ID_Mx <- cbind(ID_info, Mx)
 ID_My <- cbind(ID_info, My)
 ID_Mz <- cbind(ID_info, Mz)
 
+# Time-normalized data
+AP_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/AP_GRF_stance_N.csv", header = F)
+ML_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/ML_GRF_stance_N.csv", header = F)
+V_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/V_GRF_stance_N.csv", header = F)
+COPx_stance <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/COPx_stance.csv", header = F)
+COPy_stance <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/COPy_stance.csv", header = F)
+
+ID_AP_GRF_stance_N <- cbind(ID_info, AP_GRF_stance_N)
+
+left_2 <- subset(ID_AP_GRF_stance_N, ID_AP_GRF_stance_N$KNEE == "LEFT" & ID_AP_GRF_stance_N$TRIAL == 2)
+left_2 <- left_2 %>% pivot_longer(-c(ID, KNEE, TRIAL, tr_length), names_to = "time", values_to = "force")
+left_2$time <- gsub('^.', '', left_2$time)
+
+
+t <- rep(seq(0,100,length.out = 100),2070)
+
+
+left_2 <- cbind(left_2, t)
+
+
+p_try <- ggplot(left_2, aes(x = t, y = force, group = ID, col = ID)) +
+  geom_line()
+p_try
+
 
 # plot:
 
@@ -88,5 +112,3 @@ legend("topright",legend= c("Mx", "My","Mz"),col=c("red","green","blue"),bg="whi
 
 
 # Main goal: time series dimension reduction
-
-
