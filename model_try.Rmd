@@ -10,41 +10,23 @@ library(tidyverse)
 library(plotly)
 library(dplyr)
 library(fdapace)
+library(aplpack)
 ```
 
+Data wrangle, preparation and visualization:
+
 ```{r}
+ID_AP_GRF_stance_N <- cbind(ID_info, AP_GRF_stance_N)
 
-# Function to simulate data
-fake_curves <- function(n_curves, n_points, max_time){
-  ID <- 1:n_curves
-  x <- vector(mode = "list", length = n_curves)
-  t <- vector(mode = "list", length = n_curves)
-  
-  for (i in 1:n_curves){
-    t[i] <- list(sort(runif(n_points,0,max_time)))
-    x[i] <- list(cumsum(rnorm(n_points)) / sqrt(n_points))
-  }
-  df <- tibble(ID,t,x)
-  names(df) <- c("ID", "Time", "Curve")
-  return(df)
-}
+left_2 <- subset(ID_AP_GRF_stance_N, ID_AP_GRF_stance_N$KNEE == "LEFT" & ID_AP_GRF_stance_N$TRIAL == 2)
+left_2 <- left_2 %>% pivot_longer(-c(ID, KNEE, TRIAL, tr_length), names_to = "time", values_to = "force")
+left_2$time <- gsub('^.', '', left_2$time)
 
 
-set.seed(123)
-n_curves <- 120
-n_points <- 1000
-max_time <- 100
-df <- fake_curves(n_curves = n_curves,n_points = n_points, max_time = max_time)
-head(df)
+t <- rep(seq(0,100,length.out = 100),2070)
 
 
-df_1 <- df %>% dplyr::select(!c(ID,Curve)) %>% unnest_longer(Time)  
-df_2 <- df %>% dplyr::select(!c(ID,Time)) %>% unnest_longer(Curve)
-ID <- sort(rep(1:n_curves,n_points))
-df_l <- cbind(ID,df_1,df_2)
-p <- ggplot(df_l, aes(x = Time, y = Curve, group = ID, col = ID)) +
-  geom_line()
-p
+left_2 <- cbind(left_2, t)
 
 
 p_try <- ggplot(left_2, aes(x = t, y = force, group = ID, col = ID)) +
@@ -52,111 +34,7 @@ p_try <- ggplot(left_2, aes(x = t, y = force, group = ID, col = ID)) +
 p_try
 ```
 
-
-```{r}
-knots    = c(seq(0,max_time,5)) #Location of knots
-n_knots   = length(knots) #Number of knots
-n_order   = 4 # order of basis functions: for cubic b-splines: order = 3 + 1
-n_basis   = length(knots) + n_order - 2;
-basis = create.bspline.basis(rangeval = c(0,max_time), n_basis)
-plot(basis)
-
-
-knots_try  = c(seq(0,100,5)) #Location of knots
-n_knots_try   = length(knots_try) #Number of knots
-n_order_try   = 4 # order of basis functions: for cubic b-splines: order = 3 + 1
-n_basis_try   = length(knots_try) + n_order_try - 2;
-basis_try = create.bspline.basis(rangeval = c(0,100), n_basis_try)
-plot(basis_try)
-```
-
-
-```{r}
-argvals <- matrix(df_l$Time, nrow = n_points, ncol = n_curves)
-y_mat <- matrix(df_l$Curve, nrow = n_points, ncol = n_curves)
-
-W.obj <- Data2fd(argvals = argvals, y = y_mat, basisobj = basis, lambda = 0.5)
-
-
-argvals_try <- matrix(left_2$t, nrow = 100, ncol = 2070)
-y_mat_try <- matrix(left_2$force, nrow = 100, ncol = 2070)
-
-W.obj_try <- Data2fd(argvals = argvals_try, y = y_mat_try, basisobj = basis_try, lambda = 0.5)
-```
-
-
-```{r}
-fun_pca <- pca.fd(W.obj, nharm = 5)
-plot(fun_pca$harmonics, lwd = 3)
-
-fun_pca_try <- pca.fd(W.obj_try, nharm = 4)
-plot(fun_pca_try$harmonics, lwd = 3)
-```
-
-```{r}
-b <- data.frame(ID=left_2$ID,force=left_2$force, t = left_2$t)
-a <- split(b,b$ID)
-```
-
-
-```{r}
-c <- list()
-d <- list()
-for (i in 1:2070) {
-  c[[i]] <- a[[i]]$force
-  d[[i]] <- a[[i]]$t
-}
-
-ID <- 1:2070
-left_2_list <- tibble(ID,c,d)
-names(left_2_list) <- c("ID" , "Force", "Time")
-```
-
-```{r}
-CheckData(left_2_list$Force,left_2_list$Time)
-try_fpca <- FPCA(left_2_list$Force,left_2_list$Time)
-
-plot(try_fpca)
-```
-
-
-```{r}
-library(fdapace)
- 
-  # Set the number of subjects (N) and the
-  # number of measurements per subjects (M) 
-  N <- 200;
-  M <- 100;
-  set.seed(123)
-
-  # Define the continuum
-  s <- seq(0,10,length.out = M)
-
-  # Define the mean and 2 eigencomponents
-  meanFunct <- function(s) s + 10*exp(-(s-5)^2)
-  eigFunct1 <- function(s) +cos(2*s*pi/10) / sqrt(5)
-  eigFunct2 <- function(s) -sin(2*s*pi/10) / sqrt(5)
-
-  # Create FPC scores
-  Ksi <- matrix(rnorm(N*2), ncol=2);
-  Ksi <- apply(Ksi, 2, scale)
-  Ksi <- Ksi %*% diag(c(5,2))
-
-  # Create Y_true
-  yTrue <- Ksi %*% t(matrix(c(eigFunct1(s),eigFunct2(s)), ncol=2)) + t(matrix(rep(meanFunct(s),N), nrow=M))
-
-```
-
-
-
-```{r}
-L3 <- MakeFPCAInputs(IDs = rep(1:N, each=M), tVec=rep(s,N), t(yTrue))
-FPCAdense <- FPCA(L3$Ly, L3$Lt)
-
-# Plot the FPCA object
-plot(FPCAdense)
-```
-
+Prepare data for FPCA:
 
 ```{r}
 L_try <- MakeFPCAInputs(b$ID, b$t, b$force)
@@ -165,6 +43,8 @@ FPCAdense <- FPCA(L_try$Ly, L_try$Lt)
 # Plot the FPCA object
 plot(FPCAdense)
 ```
+
+Based on the scree-plot we see that the first three components appear to encapsulate most of the relevant variation. The number of eigen components to reach a 99% FVE is 13 but just 7 eigen components are enough to reach a 95.0%.
 
 ```{r}
 SelectK(FPCAdense, criterion = 'FVE', FVEthreshold = 0.95)
@@ -178,12 +58,20 @@ par(mfrow=c(1,2))
   CreatePathPlot(FPCAdense, subset = c(3,5,135), main = 'K = 13', pch = 4); grid()
   CreatePathPlot(FPCAdense, subset = c(3,5,135), K = 7, main = 'K = 7', pch = 4) ; grid()
 
-
 ```
+
+perform outlier detection:
 
 ```{r}
 par(mfrow=c(1,1))
   CreateOutliersPlot(FPCAdense, optns = list(K = 7, variant = 'KDE'))
 ```
+
+
+visualize data using a functional box-plot
+```{r}
+CreateFuncBoxPlot(FPCAdense, xlab = 'Stance time', ylab = 'VGRF force', optns = list(K = 7, variant='KDE'))
+```
+
 
 
