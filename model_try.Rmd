@@ -22,17 +22,22 @@ ID_V_GRF_stance_N <- cbind(ID_info, V_GRF_stance_N)
 ID_COPx_stance <- cbind(ID_info, COPx_stance)
 ID_COPy_stance <- cbind(ID_info, COPy_stance)
 
+dt = sort(sample(nrow(ID_AP_GRF_stance_N), nrow(ID_AP_GRF_stance_N)*.7))
+train.AP<-ID_AP_GRF_stance_N[dt,]
+test.AP<-ID_AP_GRF_stance_N[-dt,]
+
+
 data_pre_func <- function(df){ 
   df1<- df %>% pivot_longer(-c(ID, KNEE, TRIAL, tr_length), names_to = "time", values_to = "force") %>% 
     mutate(new = paste(ID, "-",KNEE, "-",TRIAL))
   
-  t <- rep(seq(0,100,length.out = 100),15696)
+  t <- rep(seq(0,100,length.out = 100),nrow(df))
   
   df_pre <- cbind(df1, t)
   return(df_pre)
 }
 
-try <- data_pre_func(ID_AP_GRF_stance_N)
+try <- data_pre_func(train.AP)
 try2 <- data_pre_func(ID_ML_GRF_stance_N)
 try3 <- data_pre_func(ID_V_GRF_stance_N)
 try4 <- data_pre_func(ID_COPx_stance)
@@ -71,7 +76,7 @@ perform outlier detection:
 
 ```{r}
 par(mfrow=c(1,1))
-  CreateOutliersPlot(FPCAdense, optns = list(K = 12, variant = 'KDE'))
+  CreateOutliersPlot(FPCAdense, optns = list(K = 7, variant = 'KDE'))
 ```
 
 
@@ -81,22 +86,17 @@ CreateFuncBoxPlot(FPCAdense, xlab = 'Stance time', ylab = 'VGRF force', optns = 
 ```
 
 ```{r}
+library(EMCluster)
+FClust(L_try$Ly, L_try$Lt, k = 4, cmethod = "EMCluster", optnsFPCA = NULL, optnsCS = NULL)
+```
+
+
+```{r}
 library(corrplot)
 corrplot(FPCAdense$fittedCorr, method="color")
 ```
 
 
-```{r}
-# TS cluster
-library(dtwclust)
-pc <- tsclust(L_try$Ly, type = "partitional", k = 4, 
-              distance = "dtw_basic", centroid = "pam", 
-              seed = 3247L, trace = TRUE,
-              args = tsclust_args(dist = list(window.size = 4)))
-
-
-plot(pc)
-```
 
 
 
