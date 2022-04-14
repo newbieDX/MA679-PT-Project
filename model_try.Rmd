@@ -81,6 +81,12 @@ CreateFuncBoxPlot(FPCAdense, xlab = 'Stance time', ylab = 'VGRF force', optns = 
 ```
 
 ```{r}
+library(corrplot)
+corrplot(FPCAdense$fittedCorr, method="color")
+```
+
+
+```{r}
 # TS cluster
 library(dtwclust)
 pc <- tsclust(L_try$Ly, type = "partitional", k = 4, 
@@ -89,9 +95,7 @@ pc <- tsclust(L_try$Ly, type = "partitional", k = 4,
               args = tsclust_args(dist = list(window.size = 4)))
 
 
-plot(pc, type = "centroids", clus = 1L)
-
-t(cbind(emissions[,0], cluster = clust.pam@cluster))
+plot(pc)
 ```
 
 
