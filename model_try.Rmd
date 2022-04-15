@@ -19,47 +19,43 @@ library(ggfortify)
 Data wrangle, preparation and visualization:
 
 ```{r}
-ID_AP_GRF_stance_N <- cbind(ID_info, AP_GRF_stance_N)
-ID_ML_GRF_stance_N <- cbind(ID_info, ML_GRF_stance_N)
-ID_V_GRF_stance_N <- cbind(ID_info, V_GRF_stance_N)
-ID_COPx_stance <- cbind(ID_info, COPx_stance)
-ID_COPy_stance <- cbind(ID_info, COPy_stance)
 
-dt.1 <-  sort(sample(nrow(ID_AP_GRF_stance_N), nrow(ID_AP_GRF_stance_N)*.7))
-train.AP<-ID_AP_GRF_stance_N[dt.1,]
-test.AP<-ID_AP_GRF_stance_N[-dt.1,]
+dt.1 <-  sort(sample(nrow(AP_GRF_stance_N), nrow(AP_GRF_stance_N)*.7))
+train.AP<-AP_GRF_stance_N[dt.1,]
+test.AP<-AP_GRF_stance_N[-dt.1,]
 
-train.ML<-ID_ML_GRF_stance_N[dt.1,]
-test.ML<-ID_ML_GRF_stance_N[-dt.1,]
+train.ML<-ML_GRF_stance_N[dt.1,]
+test.ML<-ML_GRF_stance_N[-dt.1,]
 
-train.V<-ID_V_GRF_stance_N[dt.1,]
-test.V<-ID_V_GRF_stance_N[-dt.1,]
+train.V<-V_GRF_stance_N[dt.1,]
+test.V<-V_GRF_stance_N[-dt.1,]
 
-train.COPx<-ID_COPx_stance[dt.1,]
-test.COPx<-ID_COPx_stance[-dt.1,]
+train.COPx<-COPx_stance[dt.1,]
+test.COPx<-COPx_stance[-dt.1,]
 
-train.COPy<-ID_COPy_stance[dt.1,]
-test.COPy<-ID_COPy_stance[-dt.1,]
+train.COPy<-COPy_stance[dt.1,]
+test.COPy<-COPy_stance[-dt.1,]
 
 train.ID <-ID_info[dt.1,]
 test.ID <-ID_info[-dt.1,]
 
 
-data_pre_func <- function(df){ 
-  df1<- df %>% pivot_longer(-c(ID, KNEE, TRIAL, tr_length), names_to = "time", values_to = "force") %>% 
-    mutate(new = paste(ID, "-",KNEE, "-",TRIAL))
+data_pre_func <- function(df1, df2){
+  df <- cbind(df1, df2)
+  df3 <- df %>% pivot_longer(-c(ID, KNEE, TRIAL, tr_length), names_to = "time", values_to = "force")%>%
+    mutate(new = paste(ID, "-",KNEE, "-",TRIAL)) 
   
   t <- rep(seq(0,100,length.out = 100),nrow(df))
   
-  df_pre <- cbind(df1, t)
+  df_pre <- cbind(df3, t)
   return(df_pre)
 }
 
-try <- data_pre_func(train.AP)
-try2 <- data_pre_func(train.ML)
-try3 <- data_pre_func(train.V)
-try4 <- data_pre_func(train.COPx)
-try5 <- data_pre_func(train.COPy)
+try <- data_pre_func(train.ID, train.AP)
+try2 <- data_pre_func(train.ID, train.ML)
+try3 <- data_pre_func(train.ID, train.V)
+try4 <- data_pre_func(train.ID, train.COPx)
+try5 <- data_pre_func(train.ID, train.COPy)
 
 # p_try <- ggplot(try, aes(x = t, y = force, group = new, col = new)) +
 #   geom_line()
@@ -228,12 +224,10 @@ train.ID$TRIAL <- as.character(train.ID$TRIAL)
 ddd <- cbind(train.ID, mat.Out)
 ddd <- ddd %>% mutate(new = paste(ID, "-",KNEE, "-",TRIAL))
 
-dt.2 <- sort(sample(nrow(ddd), nrow(ddd)*.7))
-train.ddd<-ddd[dt.2,]
-test.ddd<-ddd[-dt.2,]
 
 
-FPCs.pca <- prcomp(train.ddd[, c(5:7, 17:19, 32:33, 40,45 )], center = TRUE,scale. = TRUE)
+
+FPCs.pca <- prcomp(ddd[, c(5:7, 17:19, 32:33, 40,45)], center = TRUE,scale. = TRUE)
 summary(FPCs.pca)
 
 library(devtools)
@@ -242,8 +236,15 @@ library(ggfortify)
 autoplot(FPCs.pca,
          loadings = TRUE, loadings.colour = 'blue',
          loadings.label = TRUE, loadings.label.size = 3,
-         data = train.ddd,
-         colour = 'ID')
+         data = ddd,
+         colour = 'KNEE')
+
+
+set.seed(1)
+autoplot(kmeans(FPCs, 4), data = FPCs)
+
+set.seed(2)
+autoplot(kmeans(ddd[, c(5:7, 17:19, 32:33, 40,45)], 4), data = ddd)
 ```
 
 
