@@ -129,8 +129,6 @@ summary(discrete.pca)
 
 
 library(devtools)
-install_github("vqv/ggbiplot")
-
 library(ggfortify)
 
 autoplot(discrete.pca,
