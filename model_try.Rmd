@@ -176,6 +176,7 @@ colnames(COPy_dr) <- c('COPy_FPC1',
 GRF_FPCs <- cbind(AP_stance_dr, ML_stance_dr, V_stance_dr)
 COP_FPCs <- cbind(COPx_dr, COPy_dr)
 FPCs <- cbind(GRF_FPCs, COP_FPCs)
+colnames(FPCs)
 ```
 
 
@@ -227,10 +228,15 @@ ddd <- ddd %>% mutate(new = paste(ID, "-",KNEE, "-",TRIAL))
 aaa <- cbind(train.ID, FPCs)
 aaa <- aaa %>% mutate(new = paste(ID, "-",KNEE, "-",TRIAL))
 
+train.dis <-discrete[dt.1,]
+test.dis <-discrete[-dt.1,]
 
 
 FPCs.pca <- prcomp(FPCs[, c(1:3, 13:15, 28:29, 36,41)], center = TRUE,scale. = TRUE)
 summary(FPCs.pca)
+
+FPCs.all.pca <- prcomp(FPCs, center = TRUE,scale. = TRUE)
+summary(FPCs.all.pca)
 
 library(devtools)
 library(ggfortify)
@@ -239,11 +245,16 @@ autoplot(FPCs.pca,
          loadings = TRUE, loadings.colour = 'blue',
          loadings.label = TRUE, loadings.label.size = 3,
          data = aaa,
-         colour = 'KNEE')
+         colour = 'TRIAL',
+         frame = TRUE)
 
+
+ss <- kmeans(FPCs, 4)
 
 set.seed(1)
-autoplot(kmeans(FPCs, 4), data = FPCs)
+autoplot(kmeans(FPCs, 3),frame = TRUE, data = FPCs)
+
+autoplot(kmeans(train.dis, 2),frame = TRUE, data = train.dis)
 
 set.seed(2)
 autoplot(kmeans(FPCs[, c(1:3, 13:15, 28:29, 36,41)], 4), data = FPCs)
