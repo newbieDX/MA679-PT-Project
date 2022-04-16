@@ -224,6 +224,8 @@ train.ID$TRIAL <- as.character(train.ID$TRIAL)
 ddd <- cbind(train.ID, mat.Out)
 ddd <- ddd %>% mutate(new = paste(ID, "-",KNEE, "-",TRIAL))
 
+aaa <- cbind(train.ID, FPCs)
+aaa <- aaa %>% mutate(new = paste(ID, "-",KNEE, "-",TRIAL))
 
 
 
@@ -236,7 +238,7 @@ library(ggfortify)
 autoplot(FPCs.pca,
          loadings = TRUE, loadings.colour = 'blue',
          loadings.label = TRUE, loadings.label.size = 3,
-         data = ddd,
+         data = aaa,
          colour = 'KNEE')
 
 
