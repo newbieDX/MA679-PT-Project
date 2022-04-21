@@ -9,7 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 autoencoder
 use AP as a try
-
+vae:
 ```{r}
 library(keras)
 library(caret)
@@ -22,8 +22,8 @@ dim(train.AP)
 
 batch_size <- 100L
 original_dim <- 100L
-latent_dim <- 2L
-intermediate_dim <- 12L
+latent_dim <- 12L
+intermediate_dim <- 50L
 epochs <- 50L
 epsilon_std <- 1.0
 
@@ -81,12 +81,15 @@ vae %>% compile(optimizer = "rmsprop", loss = vae_loss)
 
 # Data preparation --------------------------------------------------------
 
-mnist <- dataset_mnist()
-x_train <- mnist$train$x/255
-x_test <- mnist$test$x/255
-x_train <- array_reshape(x_train, c(nrow(x_train), 784), order = "F")
-x_test <- array_reshape(x_test, c(nrow(x_test), 784), order = "F")
+# mnist <- dataset_mnist()
+# x_train <- mnist$train$x/255
+# x_test <- mnist$test$x/255
+# x_train <- array_reshape(x_train, c(nrow(x_train), 784), order = "F")
+# x_test <- array_reshape(x_test, c(nrow(x_test), 784), order = "F")
 
+
+x_train <- train.AP
+x_test <- test.AP
 
 # Model training ----------------------------------------------------------
 
@@ -128,5 +131,74 @@ for(i in 1:length(grid_x)){
   rows <- cbind(rows, column)
 }
 rows %>% as.raster() %>% plot()
+```
+
+
+LSTM ae:
+```{r}
+# defining constants
+n <- 1000
+s <- 10
+f <- 20
+
+# generating random input and target variable
+x<-array(runif(n*s*f, min=-1,max=1), dim=c(n,s,f)) 
+str(x)
+y<-c(runif(n, min=-1,max=1)) 
+str(y)
+
+AP <- array(train.AP)
+
+# training constants
+EPOCHS <- 50
+BATCH <- 100
+
+# definign stacked autoencoder
+input_timeseries <- layer_input(shape = c(s,f))
+encoded_l1<- layer_dense(input_timeseries, units = f)
+encoded_l2<- layer_dense(encoded_l1, units = s)
+decoded_l1<- layer_dense(encoded_l2, units = s)
+decoded<- layer_dense(decoded_l1, f)
+
+# generating model for autoencoder
+autoencoder <- keras_model(input_timeseries, decoded)
+# generating model for encoder
+model_en <<- keras_model(input_timeseries, encoded_l2)
+
+summary(autoencoder)
+summary(model_en)
+
+autoencoder  %>% compile(loss = 'mae', optimizer='adam')
+
+# fitting stacked autoencoder
+autoencoder %>% fit(
+  x = x, 
+  y = x, 
+  epochs = EPOCHS,
+  batch_size = BATCH
+)
+
+# input layer for LSTM
+lstm_input_timeseries <- layer_input(shape = c(s,f))
+lstm_input = model_en(lstm_input_timeseries)
+
+
+# defining LSTM
+lstm_layer_l1 <- layer_lstm(units = s, input_shape = c(s,s), return_sequences = TRUE, stateful = FALSE)(lstm_input)
+lstm_layer_l2 <- layer_lstm(units = 1, return_sequences = FALSE, stateful = FALSE)(lstm_layer_l1)
+
+final_model <- keras_model(inputs=lstm_input_timeseries, outputs=lstm_layer_l2)
+
+
+final_model %>% compile(loss = 'mae', optimizer='adam')
+
+summary(final_model)
+
+# training LSTM
+final_model %>% fit(x, y, 
+                   batch_size = BATCH, 
+                   epochs = EPOCHS, 
+                   verbose = 1, 
+                   shuffle = FALSE)
 ```
 
