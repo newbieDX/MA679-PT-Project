@@ -14,6 +14,8 @@ library(fdapace)
 library(ks)
 library(devtools)
 library(ggfortify)
+library(fda.usc)
+library(DDoutlier)
 ```
 
 Data wrangle, preparation and visualization:
@@ -298,6 +300,7 @@ par(mfrow=c(1,1))
   CreateOutliersPlot(FPCAdense_COPy, optns = list(K = 2, variant = 'KDE'))
   
 ```
+
 
 
 visualize data using a functional box-plot
