@@ -7,158 +7,174 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-autoencoder
-use AP as a try
-vae:
+
+prepare data
 ```{r}
+dim(AP)
+
 library(keras)
 library(caret)
 
 K <- keras::backend()
-
-dim(train.AP)
-
-# Parameters --------------------------------------------------------------
-
-batch_size <- 100L
-original_dim <- 100L
-latent_dim <- 12L
-intermediate_dim <- 50L
-epochs <- 50L
-epsilon_std <- 1.0
-
-# Model definition --------------------------------------------------------
-
-x <- layer_input(shape = c(original_dim))
-h <- layer_dense(x, intermediate_dim, activation = "relu")
-z_mean <- layer_dense(h, latent_dim)
-z_log_var <- layer_dense(h, latent_dim)
-
-sampling <- function(arg){
-  z_mean <- arg[, 1:(latent_dim)]
-  z_log_var <- arg[, (latent_dim + 1):(2 * latent_dim)]
-  
-  epsilon <- k_random_normal(
-    shape = c(k_shape(z_mean)[[1]]), 
-    mean=0.,
-    stddev=epsilon_std
-  )
-  
-  z_mean + k_exp(z_log_var/2)*epsilon
-}
-
-# note that "output_shape" isn't necessary with the TensorFlow backend
-z <- layer_concatenate(list(z_mean, z_log_var)) %>% 
-  layer_lambda(sampling)
-
-# we instantiate these layers separately so as to reuse them later
-decoder_h <- layer_dense(units = intermediate_dim, activation = "relu")
-decoder_mean <- layer_dense(units = original_dim, activation = "sigmoid")
-h_decoded <- decoder_h(z)
-x_decoded_mean <- decoder_mean(h_decoded)
-
-# end-to-end autoencoder
-vae <- keras_model(x, x_decoded_mean)
-
-# encoder, from inputs to latent space
-encoder <- keras_model(x, z_mean)
-
-# generator, from latent space to reconstructed inputs
-decoder_input <- layer_input(shape = latent_dim)
-h_decoded_2 <- decoder_h(decoder_input)
-x_decoded_mean_2 <- decoder_mean(h_decoded_2)
-generator <- keras_model(decoder_input, x_decoded_mean_2)
-
-
-vae_loss <- function(x, x_decoded_mean){
-  xent_loss <- (original_dim/1.0)*loss_binary_crossentropy(x, x_decoded_mean)
-  kl_loss <- -0.5*k_mean(1 + z_log_var - k_square(z_mean) - k_exp(z_log_var), axis = -1L)
-  xent_loss + kl_loss
-}
-
-vae %>% compile(optimizer = "rmsprop", loss = vae_loss)
-
-
-# Data preparation --------------------------------------------------------
-
-# mnist <- dataset_mnist()
-# x_train <- mnist$train$x/255
-# x_test <- mnist$test$x/255
-# x_train <- array_reshape(x_train, c(nrow(x_train), 784), order = "F")
-# x_test <- array_reshape(x_test, c(nrow(x_test), 784), order = "F")
-
-
-x_train <- train.AP
-x_test <- test.AP
-
-# Model training ----------------------------------------------------------
-
-vae %>% fit(
-  x_train, x_train, 
-  shuffle = TRUE, 
-  epochs = epochs, 
-  batch_size = batch_size, 
-  validation_data = list(x_test, x_test)
-)
-
-
-# Visualizations ----------------------------------------------------------
-
-library(ggplot2)
-library(dplyr)
-x_test_encoded <- predict(encoder, x_test, batch_size = batch_size)
-
-x_test_encoded %>%
-  as_data_frame() %>% 
-  mutate(class = as.factor(mnist$test$y)) %>%
-  ggplot(aes(x = V1, y = V2, colour = class)) + geom_point()
-
-# display a 2D manifold of the digits
-n <- 15  # figure with 15x15 digits
-digit_size <- 28
-
-# we will sample n points within [-4, 4] standard deviations
-grid_x <- seq(-4, 4, length.out = n)
-grid_y <- seq(-4, 4, length.out = n)
-
-rows <- NULL
-for(i in 1:length(grid_x)){
-  column <- NULL
-  for(j in 1:length(grid_y)){
-    z_sample <- matrix(c(grid_x[i], grid_y[j]), ncol = 2)
-    column <- rbind(column, predict(generator, z_sample) %>% matrix(ncol = 28) )
-  }
-  rows <- cbind(rows, column)
-}
-rows %>% as.raster() %>% plot()
 ```
 
 
-LSTM ae:
+start with a feed-forward network with one hidden layer
+```{r}
+
+AP.pca <- prcomp(train.AP)
+summary(AP.pca)
+
+xtrain <- as.matrix(train.AP)
+xtest <- as.matrix(test.AP)
+
+model <- keras_model_sequential()
+model %>%
+  layer_dense(units = 75, activation = "relu", input_shape = ncol(xtrain)) %>%
+  layer_dense(units = 50, activation = "relu") %>%
+  layer_dense(units = 25, activation = "relu") %>%
+  layer_dense(units = 15, activation = "relu", name = "bottleneck") %>%
+  layer_dense(units = 25, activation = "relu") %>%
+  layer_dense(units = 50, activation = "relu") %>%
+  layer_dense(units = 75, activation = "relu") %>%
+  layer_dense(units = ncol(xtrain))
+
+# summar of model
+summary(model) 
+
+
+# compile model
+model %>% compile(
+  loss = "mean_squared_error", 
+  optimizer = "adam"
+)
+
+# fit model
+
+history <- model %>% fit(
+  x = xtrain, 
+  y = xtrain, 
+  epochs = 100,
+  verbose = 0,
+  shuffle=TRUE,validation_data= list(xtest, xtest)
+)
+
+
+
+
+plot(history)
+
+
+# evaluate the performance of the model
+mse.ae2 <- evaluate(model, xtrain, xtrain)
+mse.ae2
+
+```
+
+
+```{r}
+ggplot(data.frame(PC1 = intermediate_output[,1], PC2 = intermediate_output[,2]), aes(x = PC1, y = PC2)) + geom_point()
+```
+
+
+```{r}
+# PCA reconstruction
+pca.recon <- function(pca, mat, k){
+  mu <- matrix(rep(pca$center, nrow(pca$x)), nrow = nrow(pca$x), byrow = T)
+  recon <- pca$x[,1:k] %*% t(pca$rotation[,1:k]) + mu
+  mse <- mean((recon - mat)^2)
+  return(list(x = recon, mse = mse))
+}
+
+xhat <- rep(NA, 100)
+for(k in 1:100){
+  xhat[k] <- pca.recon(AP.pca, xtrain, k)$mse
+}
+
+
+#Autoencoder reconstruction
+ae.mse <- rep(NA, 49)
+for(k in 1:49){
+  modelk <- keras_model_sequential()
+  modelk %>%
+    layer_dense(units = 75, activation = "relu", input_shape = ncol(xtrain)) %>%
+    layer_dense(units = 50, activation = "relu") %>%
+    layer_dense(units = k, activation = "relu", name = "bottleneck") %>%
+    layer_dense(units = 50, activation = "relu") %>%
+    layer_dense(units = 75, activation = "relu") %>%
+    layer_dense(units = ncol(xtrain))
+  modelk %>% compile(
+    loss = "mean_squared_error", 
+    optimizer = "adam"
+  )
+  modelk %>% fit(
+    x = xtrain, 
+    y = xtrain, 
+    epochs = 20,
+    verbose = 0
+  )
+  ae.mse[k] <- unname(evaluate(modelk, xtrain, xtrain))
+}
+df <- data.frame(k = c(1:100, 1:50), mse = c(xhat, ae.mse), method = c(rep("pca", 100), rep("autoencoder", 50)))
+ggplot(df, aes(x = k, y = mse, col = method)) + geom_line()
+```
+
+
+
+1D CNN 
+```{r}
+x_train = array_reshape(xtrain, c(dim(xtrain), 1))
+x_test = array_reshape(xtest, c(dim(xtest), 1))
+
+ 
+model_1d <- keras_model_sequential() 
+model_1d %>% 
+  layer_conv_1d(filters= 100, kernel_size= 4,  activation = "relu",  input_shape= c(100,1)) %>%
+  #layer_global_max_pooling_1d() %>%
+  layer_max_pooling_1d(pool_size = 2L) %>%
+  layer_flatten() %>% 
+  layer_dense(units = 70, activation = 'relu') %>%
+  layer_dropout(rate=0.2) %>%
+  layer_dense(units = 1, activation = 'sigmoid')
+summary(model_1d)
+model_1d %>% compile(
+    loss = "mean_squared_error", 
+    optimizer = "adam",
+  metrics = c('accuracy')
+)
+history <- model_1d %>% fit(
+  x_train, x_train, 
+  epochs = 60, batch_size = 30, 
+  validation_split = 0.2
+)
+plot(history)
+model %>% evaluate(x_test, x_test)
+```
+
+
+Pretraining LSTM with Stacked Autoencoders:
 ```{r}
 # defining constants
-n <- 1000
-s <- 10
-f <- 20
+N=1000
+S=10
+F=20
 
 # generating random input and target variable
-x<-array(runif(n*s*f, min=-1,max=1), dim=c(n,s,f)) 
+x<-array(runif(N*S*F, min=-1,max=1), dim=c(N,S,F)) 
 str(x)
-y<-c(runif(n, min=-1,max=1)) 
+y<-c(runif(N, min=-1,max=1)) 
 str(y)
 
-AP <- array(train.AP)
-
 # training constants
-EPOCHS <- 50
-BATCH <- 100
+EPOCHS=100
+BATCH=100
 
 # definign stacked autoencoder
-input_timeseries <- layer_input(shape = c(s,f))
-encoded_l1<- layer_dense(input_timeseries, units = f)
-encoded_l2<- layer_dense(encoded_l1, units = s)
-decoded_l1<- layer_dense(encoded_l2, units = s)
-decoded<- layer_dense(decoded_l1, f)
+input_timeseries <- layer_input(shape = c(S,F))
+encoded_l1<- layer_dense(input_timeseries, units = F)
+encoded_l2<- layer_dense(encoded_l1, units = S)
+decoded_l1<- layer_dense(encoded_l2, units = S)
+decoded<- layer_dense(decoded_l1, F)
 
 # generating model for autoencoder
 autoencoder <- keras_model(input_timeseries, decoded)
@@ -179,12 +195,12 @@ autoencoder %>% fit(
 )
 
 # input layer for LSTM
-lstm_input_timeseries <- layer_input(shape = c(s,f))
+lstm_input_timeseries <- layer_input(shape = c(S,F))
 lstm_input = model_en(lstm_input_timeseries)
 
 
 # defining LSTM
-lstm_layer_l1 <- layer_lstm(units = s, input_shape = c(s,s), return_sequences = TRUE, stateful = FALSE)(lstm_input)
+lstm_layer_l1 <- layer_lstm(units = S, input_shape = c(S,S), return_sequences = TRUE, stateful = FALSE)(lstm_input)
 lstm_layer_l2 <- layer_lstm(units = 1, return_sequences = FALSE, stateful = FALSE)(lstm_layer_l1)
 
 final_model <- keras_model(inputs=lstm_input_timeseries, outputs=lstm_layer_l2)
@@ -200,5 +216,6 @@ final_model %>% fit(x, y,
                    epochs = EPOCHS, 
                    verbose = 1, 
                    shuffle = FALSE)
+
 ```
 
