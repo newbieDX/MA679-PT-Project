@@ -129,22 +129,20 @@ x_test = array_reshape(xtest, c(dim(xtest), 1))
  
 model_1d <- keras_model_sequential() 
 model_1d %>% 
-  layer_conv_1d(filters= 100, kernel_size= 4,  activation = "relu",  input_shape= c(100,1)) %>%
+  layer_conv_1d(filters= 100, kernel_size= 10,  activation = "relu",  input_shape= c(100,1)) %>%
   #layer_global_max_pooling_1d() %>%
   layer_max_pooling_1d(pool_size = 2L) %>%
   layer_flatten() %>% 
-  layer_dense(units = 70, activation = 'relu') %>%
-  layer_dropout(rate=0.2) %>%
-  layer_dense(units = 1, activation = 'sigmoid')
+  layer_dense(units = 20, activation = 'relu') %>%
+  layer_dense(units = 1, activation = 'softmax')
 summary(model_1d)
 model_1d %>% compile(
     loss = "mean_squared_error", 
-    optimizer = "adam",
-  metrics = c('accuracy')
+    optimizer = "adam"
 )
 history <- model_1d %>% fit(
   x_train, x_train, 
-  epochs = 60, batch_size = 30, 
+  epochs = 60, batch_size = 100, 
   validation_split = 0.2
 )
 plot(history)
