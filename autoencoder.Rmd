@@ -30,13 +30,9 @@ xtest <- as.matrix(test.AP)
 
 model <- keras_model_sequential()
 model %>%
-  layer_dense(units = 75, activation = "relu", input_shape = ncol(xtrain)) %>%
-  layer_dense(units = 50, activation = "relu") %>%
-  layer_dense(units = 25, activation = "relu") %>%
-  layer_dense(units = 15, activation = "relu", name = "bottleneck") %>%
-  layer_dense(units = 25, activation = "relu") %>%
-  layer_dense(units = 50, activation = "relu") %>%
-  layer_dense(units = 75, activation = "relu") %>%
+  layer_dense(units = 76, activation = "relu", input_shape = ncol(xtrain)) %>%
+  layer_dense(units = 55, activation = "relu", name = "bottleneck") %>%
+  layer_dense(units = 76, activation = "relu") %>%
   layer_dense(units = ncol(xtrain))
 
 # summar of model
@@ -46,7 +42,8 @@ summary(model)
 # compile model
 model %>% compile(
   loss = "mean_squared_error", 
-  optimizer = "adam"
+  optimizer = "adam",
+  metrics = c('accuracy')
 )
 
 # fit model
@@ -54,19 +51,17 @@ model %>% compile(
 history <- model %>% fit(
   x = xtrain, 
   y = xtrain, 
-  epochs = 100,
-  verbose = 0,
-  shuffle=TRUE,validation_data= list(xtest, xtest)
+  epochs = 80,
+  batch_size = 100,
+  validation_data= list(xtest, xtest)
 )
-
-
 
 
 plot(history)
 
 
 # evaluate the performance of the model
-mse.ae2 <- evaluate(model, xtrain, xtrain)
+mse.ae2 <- evaluate(model, xtest, xtest)
 mse.ae2
 
 ```
@@ -93,15 +88,13 @@ for(k in 1:100){
 
 
 #Autoencoder reconstruction
-ae.mse <- rep(NA, 49)
-for(k in 1:49){
+ae.mse <- rep(NA, 75)
+for(k in 1:75){
   modelk <- keras_model_sequential()
   modelk %>%
-    layer_dense(units = 75, activation = "relu", input_shape = ncol(xtrain)) %>%
-    layer_dense(units = 50, activation = "relu") %>%
+    layer_dense(units = 76, activation = "relu", input_shape = ncol(xtrain)) %>%
     layer_dense(units = k, activation = "relu", name = "bottleneck") %>%
-    layer_dense(units = 50, activation = "relu") %>%
-    layer_dense(units = 75, activation = "relu") %>%
+    layer_dense(units = 76, activation = "relu") %>%
     layer_dense(units = ncol(xtrain))
   modelk %>% compile(
     loss = "mean_squared_error", 
@@ -110,110 +103,72 @@ for(k in 1:49){
   modelk %>% fit(
     x = xtrain, 
     y = xtrain, 
-    epochs = 20,
+    epochs = 60,
     verbose = 0
   )
   ae.mse[k] <- unname(evaluate(modelk, xtrain, xtrain))
 }
-df <- data.frame(k = c(1:100, 1:50), mse = c(xhat, ae.mse), method = c(rep("pca", 100), rep("autoencoder", 50)))
+df <- data.frame(k = c(1:100, 1:75), mse = c(xhat, ae.mse), method = c(rep("pca", 100), rep("autoencoder", 75)))
 ggplot(df, aes(x = k, y = mse, col = method)) + geom_line()
+
+summary(AP.pca)
 ```
 
 
 
 1D CNN 
 ```{r}
+xtrain <- as.matrix(train.AP)
 x_train = array_reshape(xtrain, c(dim(xtrain), 1))
 x_test = array_reshape(xtest, c(dim(xtest), 1))
 
+ytrain <- as.matrix(AP_stance_dr)
+
+
+y_train <- array_reshape(ytrain, c(dim(ytrain), 1))
+
  
-model_1d <- keras_model_sequential() 
-model_1d %>% 
-  layer_conv_1d(filters= 100, kernel_size= 10,  activation = "relu",  input_shape= c(100,1)) %>%
-  #layer_global_max_pooling_1d() %>%
+encoder_1d <- keras_model_sequential() 
+encoder_1d %>% 
+  layer_conv_1d(filters= 64, kernel_size= 10,  activation = "relu",  input_shape= c(100,1)) %>%
   layer_max_pooling_1d(pool_size = 2L) %>%
+  layer_conv_1d(filters= 128, kernel_size= 10,  activation = "relu") %>%
+  layer_upsampling_1d(size = 2L) %>%
   layer_flatten() %>% 
-  layer_dense(units = 20, activation = 'relu') %>%
-  layer_dense(units = 1, activation = 'softmax')
-summary(model_1d)
-model_1d %>% compile(
+  layer_dense(units = 76, activation = 'relu') %>%
+  layer_dense(units = 30, activation = 'relu', name = "bottleneck") %>%
+  layer_reshape(c(30, 1)) %>%
+  layer_conv_1d(filters= 128, kernel_size= 10,  activation = "relu", input_shape= c(30,1)) %>%
+  layer_upsampling_1d(size = 2L) %>%
+  layer_conv_1d(filters= 64, kernel_size= 10,  activation = "relu") %>%
+  layer_upsampling_1d(size = 2L) %>%
+  layer_flatten() %>%
+  layer_dense(units = 76, activation = 'relu')%>%
+  layer_dense(units = 100)
+summary(encoder_1d)
+encoder_1d %>% compile(
     loss = "mean_squared_error", 
     optimizer = "adam"
 )
-history <- model_1d %>% fit(
+
+history <- encoder_1d %>% fit(
   x_train, x_train, 
-  epochs = 60, batch_size = 100, 
-  validation_split = 0.2
+  epochs = 60, batch_size = 100
 )
+
 plot(history)
-model %>% evaluate(x_test, x_test)
+encoder_1d %>% evaluate(x_test, x_test)
+
+# extract the bottleneck layer
+
+intermediate_layer_model <- keras_model(inputs = model_1d$input, outputs = get_layer(model_1d, "dense_8")$output)
+
+intermediate_output <- predict(intermediate_layer_model, x_train)
+
+
+dim(x_train)
 ```
 
 
 Pretraining LSTM with Stacked Autoencoders:
-```{r}
-# defining constants
-N=1000
-S=10
-F=20
-
-# generating random input and target variable
-x<-array(runif(N*S*F, min=-1,max=1), dim=c(N,S,F)) 
-str(x)
-y<-c(runif(N, min=-1,max=1)) 
-str(y)
-
-# training constants
-EPOCHS=100
-BATCH=100
-
-# definign stacked autoencoder
-input_timeseries <- layer_input(shape = c(S,F))
-encoded_l1<- layer_dense(input_timeseries, units = F)
-encoded_l2<- layer_dense(encoded_l1, units = S)
-decoded_l1<- layer_dense(encoded_l2, units = S)
-decoded<- layer_dense(decoded_l1, F)
-
-# generating model for autoencoder
-autoencoder <- keras_model(input_timeseries, decoded)
-# generating model for encoder
-model_en <<- keras_model(input_timeseries, encoded_l2)
-
-summary(autoencoder)
-summary(model_en)
-
-autoencoder  %>% compile(loss = 'mae', optimizer='adam')
-
-# fitting stacked autoencoder
-autoencoder %>% fit(
-  x = x, 
-  y = x, 
-  epochs = EPOCHS,
-  batch_size = BATCH
-)
-
-# input layer for LSTM
-lstm_input_timeseries <- layer_input(shape = c(S,F))
-lstm_input = model_en(lstm_input_timeseries)
-
-
-# defining LSTM
-lstm_layer_l1 <- layer_lstm(units = S, input_shape = c(S,S), return_sequences = TRUE, stateful = FALSE)(lstm_input)
-lstm_layer_l2 <- layer_lstm(units = 1, return_sequences = FALSE, stateful = FALSE)(lstm_layer_l1)
-
-final_model <- keras_model(inputs=lstm_input_timeseries, outputs=lstm_layer_l2)
-
-
-final_model %>% compile(loss = 'mae', optimizer='adam')
-
-summary(final_model)
-
-# training LSTM
-final_model %>% fit(x, y, 
-                   batch_size = BATCH, 
-                   epochs = EPOCHS, 
-                   verbose = 1, 
-                   shuffle = FALSE)
-
-```
 
