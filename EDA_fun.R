@@ -22,11 +22,11 @@ My <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/My.csv", header = F)
 Mz <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/Mz.csv", header = F)
 
 # Time-normalized data
-AP_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/AP_GRF_stance_N.csv", header = F)
-ML_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/ML_GRF_stance_N.csv", header = F)
-V_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/V_GRF_stance_N.csv", header = F)
-COPx_stance <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/COPx_stance.csv", header = F)
-COPy_stance <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/COPy_stance.csv", header = F)
+AP_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/AP_GRF_stance_N.csv", header = FALSE)
+ML_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/ML_GRF_stance_N.csv", header = FALSE)
+V_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/V_GRF_stance_N.csv", header = FALSE)
+COPx_stance <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/COPx_stance.csv", header = FALSE)
+COPy_stance <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/COPy_stance.csv", header = FALSE)
 
 # EDA:
 # ID_info

@@ -51,9 +51,8 @@ model %>% compile(
 history <- model %>% fit(
   x = xtrain, 
   y = xtrain, 
-  epochs = 80,
-  batch_size = 100,
-  validation_data= list(xtest, xtest)
+  epochs = 60,
+  verbose = 0
 )
 
 
@@ -64,11 +63,17 @@ plot(history)
 mse.ae2 <- evaluate(model, xtest, xtest)
 mse.ae2
 
+yhat_normal_ae <- predict(model, xtrain, verbose=0)
+
+intermediate_layer_model <- keras_model(inputs = model$input, outputs = get_layer(model, "bottleneck")$output)
+
+intermediate_output <- predict(intermediate_layer_model, xtrain)
+
 ```
 
 
 ```{r}
-ggplot(data.frame(PC1 = intermediate_output[,1], PC2 = intermediate_output[,2]), aes(x = PC1, y = PC2)) + geom_point()
+ggplot(data.frame(PC6 = intermediate_output[,6], PC7 = intermediate_output[,7]), aes(x = PC6, y = PC7)) + geom_point()
 ```
 
 
@@ -165,10 +170,63 @@ intermediate_layer_model <- keras_model(inputs = model_1d$input, outputs = get_l
 
 intermediate_output <- predict(intermediate_layer_model, x_train)
 
-
-dim(x_train)
 ```
 
 
 Pretraining LSTM with Stacked Autoencoders:
 
+```{r}
+library(kerasR)
+xtrain <- as.matrix(train.AP)
+x_train_lstm = array_reshape(xtrain, c(dim(xtrain)[1], 1, dim(xtrain)[2]))
+x_test_lstm = array_reshape(xtest, c(dim(xtest)[1], 1, dim(xtest)[2]))
+
+lstm_model <- keras_model_sequential() 
+lstm_model %>% 
+  layer_lstm(units = 128, activation = "relu", return_sequences = TRUE, input_shape = c(1,100))%>%
+  layer_lstm(units = 32,activation = "relu", return_sequences = FALSE, input_shape = c(1,100))%>%
+  layer_repeat_vector(1)%>%
+  layer_lstm(units = 32, activation = "relu",return_sequences = TRUE, input_shape = c(1,100))%>%
+  layer_lstm(units = 128,activation = "relu", return_sequences = TRUE, input_shape = c(1,100))%>%
+  time_distributed(layer_dense(units = 100))
+
+summary(lstm_model)
+lstm_model %>% compile(
+    loss = "mean_squared_error", 
+    optimizer = "adam"
+)
+
+lstm_model %>% fit(
+  x_train_lstm, x_train_lstm, 
+  epochs = 60,
+  verbose = 1
+)
+
+lstm_model %>% evaluate(x_test_lstm, x_test_lstm)
+
+
+a <- as.matrix(expand_dims(x_train_lstm[1,,],  axis = 0))
+
+bottlenect_model <- keras_model(inputs = lstm_model$input, outputs = get_layer(lstm_model, "lstm_99")$output)
+
+yhat_dr <- predict(bottlenect_model, x_train_lstm, verbose=0)
+
+
+recons_model <- keras_model(inputs = lstm_model$input, outputs = lstm_model$output)
+
+yhat <- predict(recons_model, x_train_lstm, verbose=0)
+
+plot(x_train_lstm[1,,], type = "l", col = "red")
+lines(yhat[1,,], type = "l", col = "green")
+lines(yhat_dr[1,,], type = "l", col = "blue")
+lines(FPCAdense_AP$xiEst[1,], type = "l", col = "black")
+lines(yhat_normal_ae[1,], type = "l", col = "blue")
+lines(intermediate_output[1,], type = "l", col = "purple")
+
+
+yhat_dr <- array_reshape(yhat_dr, c(10987, 32))
+
+ggplot(data.frame(PC1 = yhat_dr[,1], PC5 = yhat_dr[,5]), aes(x = PC1, y = PC5)) + geom_point()
+
+View(yhat_dr)
+```

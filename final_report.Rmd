@@ -1,0 +1,314 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The first step: dataset select
+
+select AP_GRFs, ML_GRFs, V_GRFs, COPx, COPy
+
+detect outliers for 5 time normalized dataset and label them
+
+```{r}
+library(fda.usc)
+library(fdaoutlier)
+library(tidyverse)
+library(plotly)
+library(dplyr)
+
+
+combined_grf <- cbind(AP_GRF_stance_N, ML_GRF_stance_N, V_GRF_stance_N)
+
+
+ap_ms <- msplot(dts = AP_GRF_stance_N, plot = F)
+ap_ms$outliers
+
+ap_outlier_id <- ap_ms$outliers
+
+ap_grf <- AP_GRF_stance_N %>%
+  mutate(index = row_number())
+
+# label the outliers
+
+for (i in 1:nrow(ap_grf)) {
+  if (ap_grf$index[i] %in% ap_outlier_id == TRUE) {
+    ap_grf$status[i] = "Outlier"
+  }
+  if (ap_grf$index[i] %in% ap_outlier_id == FALSE) {
+    ap_grf$status[i] = "Good"
+  }
+}
+
+ap_grf <- ap_grf[c(102, 1:100)]
+
+
+
+ml_ms <- msplot(dts = ML_GRF_stance_N, plot = F)
+ml_ms$outliers
+
+ml_outlier_id <- ml_ms$outliers
+
+ml_grf <- ML_GRF_stance_N %>%
+  mutate(index = row_number())
+
+# label the outliers
+
+for (i in 1:nrow(ml_grf)) {
+  if (ml_grf$index[i] %in% ml_outlier_id == TRUE) {
+    ml_grf$status[i] = "Outlier"
+  }
+  if (ml_grf$index[i] %in% ml_outlier_id == FALSE) {
+    ml_grf$status[i] = "Good"
+  }
+}
+
+ml_grf <- ml_grf[c(102, 1:100)]
+
+```
+
+
+Normal PCA
+
+```{r}
+library(devtools)
+library(ggfortify)
+
+dt.1 <-  sort(sample(nrow(ap_grf), nrow(ap_grf)*.7))
+train.ap<-ap_grf[dt.1,]
+test.ap<-ap_grf[-dt.1,]
+
+
+ap_grf.pca <- prcomp(train.ap[c(2:101)])
+
+pca_ap_plot <- autoplot(ap_grf.pca,
+         loadings = FALSE, loadings.colour = 'blue',
+         loadings.label = FALSE, loadings.label.size = 3,
+         data = train.ap,
+         colour = "status")
+
+summary(ap_grf.pca)
+
+pca_ap_plot
+
+```
+
+
+Functional PCA
+
+```{r}
+dt.1 <-  sort(sample(nrow(ap_grf), nrow(ap_grf)*.7))
+train.fpca.AP<-AP_GRF_stance_N[dt.1,]
+test.fpca.AP<-AP_GRF_stance_N[-dt.1,]
+
+train.ML<-ML_GRF_stance_N[dt.1,]
+test.ML<-ML_GRF_stance_N[-dt.1,]
+
+train.V<-V_GRF_stance_N[dt.1,]
+test.V<-V_GRF_stance_N[-dt.1,]
+
+train.COPx<-COPx_stance[dt.1,]
+test.COPx<-COPx_stance[-dt.1,]
+
+train.COPy<-COPy_stance[dt.1,]
+test.COPy<-COPy_stance[-dt.1,]
+
+train.ID <-ID_info[dt.1,]
+test.ID <-ID_info[-dt.1,]
+
+
+data_pre_func <- function(df1, df2){
+  df <- cbind(df1, df2)
+  df3 <- df %>% pivot_longer(-c(ID, KNEE, TRIAL, tr_length), names_to = "time", values_to = "force")%>%
+    mutate(new = paste(ID, "-",KNEE, "-",TRIAL)) 
+  
+  t <- rep(seq(0,100,length.out = 100),nrow(df))
+  
+  df_pre <- cbind(df3, t)
+  return(df_pre)
+}
+
+try <- data_pre_func(train.ID, train.fpca.AP)
+try2 <- data_pre_func(train.ID, train.ML)
+try3 <- data_pre_func(train.ID, train.V)
+try4 <- data_pre_func(train.ID, train.COPx)
+try5 <- data_pre_func(train.ID, train.COPy)
+```
+
+
+Do FPCA for all 5 time normalized dfs:
+```{r}
+L_AP <- MakeFPCAInputs(try$new, try$t, try$force)
+FPCAdense_AP <- FPCA(L_AP$Ly, L_AP$Lt)
+
+# Plot the FPCA object
+plot(FPCAdense_AP)
+
+
+# Select the first PCs:
+AP_stance_dr <- FPCAdense_AP$xiEst
+colnames(AP_stance_dr) <- c('AP_FPC1', 
+                            'AP_FPC2', 
+                            'AP_FPC3',
+                            'AP_FPC4',
+                            'AP_FPC5', 
+                            'AP_FPC6', 
+                            'AP_FPC7',
+                            'AP_FPC8',
+                            'AP_FPC9',
+                            'AP_FPC10',
+                            'AP_FPC11',
+                            'AP_FPC12')
+
+
+
+
+fpca_ap_ms <- msplot(dts = AP_stance_dr, plot = F)
+fpca_ap_ms$outliers
+
+fpca_ap_outlier_id <- fpca_ap_ms$outliers
+
+fpca_ap_grf <- AP_stance_dr %>% as.data.frame() %>%
+  mutate(index = row_number())
+
+# label the outliers
+
+for (i in 1:nrow(fpca_ap_grf)) {
+  if (fpca_ap_grf$index[i] %in% fpca_ap_outlier_id == TRUE) {
+    fpca_ap_grf$status[i] = "Outlier"
+  }
+  if (fpca_ap_grf$index[i] %in% fpca_ap_outlier_id == FALSE) {
+    fpca_ap_grf$status[i] = "Good"
+  }
+}
+
+
+fpc_ap.pca <- prcomp(fpca_ap_grf[1:12])
+
+fpca_ap_plot <- autoplot(fpc_ap.pca,
+         loadings = FALSE, loadings.colour = 'blue',
+         loadings.label = FALSE, loadings.label.size = 3,
+         data = fpca_ap_grf,
+         colour = "status")
+
+
+fpca_ap_plot
+```
+
+
+Normal autoencoder
+
+```{r}
+
+xtrain <- as.matrix(train.ap[c(2:101)])
+xtest <- as.matrix(test.ap[c(2:101)])
+ytrain <- as.matrix(train.ap[c(1)])
+
+model_ap <- keras_model_sequential()
+model_ap %>%
+  layer_dense(units = 76, activation = "relu", input_shape = ncol(xtrain)) %>%
+  layer_dense(units = 50, activation = "relu", name = "bottleneck") %>%
+  layer_dense(units = 76, activation = "relu") %>%
+  layer_dense(units = ncol(xtrain))
+
+# summar of model
+summary(model_ap) 
+
+
+# compile model
+model_ap %>% compile(
+  loss = "mean_squared_error", 
+  optimizer = "adam",
+  metrics = c('accuracy')
+)
+
+# fit model
+
+history <- model_ap %>% fit(
+  x = xtrain, 
+  y = xtrain, 
+  epochs = 60,
+  verbose = 0
+)
+
+
+
+plot(history)
+
+
+# evaluate the performance of the model
+mse.ae.ap <- evaluate(model_ap, xtrain, xtrain)
+mse.ae.ap
+
+hidden_layer_model_ap <- keras_model(inputs = model_ap$input, outputs = get_layer(model_ap, "bottleneck")$output)
+
+hidden_output_ap <- predict(hidden_layer_model_ap, xtrain)
+
+
+normal_ap_plot <- ggplot(data.frame(PC1 = hidden_output_ap[,1], PC2 = hidden_output_ap[,2]), aes(x = PC1, y = PC2, col = train.ap$status)) + geom_point()
+
+
+normal_ap_plot
+```
+
+
+Pretraining LSTM Autoencoders:
+
+```{r}
+library(kerasR)
+xtrain <- as.matrix(train.ap[c(2:101)])
+x_train_lstm = array_reshape(xtrain, c(dim(xtrain)[1], 1, dim(xtrain)[2]))
+x_test_lstm = array_reshape(xtest, c(dim(xtest)[1], 1, dim(xtest)[2]))
+
+lstm_model <- keras_model_sequential() 
+lstm_model %>% 
+  layer_lstm(units = 64, activation = "relu", return_sequences = TRUE, input_shape = c(1,100))%>%
+  layer_lstm(units = 32,activation = "relu", return_sequences = FALSE, input_shape = c(1,100))%>%
+  layer_repeat_vector(1)%>%
+  layer_lstm(units = 32, activation = "relu",return_sequences = TRUE, input_shape = c(1,100))%>%
+  layer_lstm(units = 64,activation = "relu", return_sequences = TRUE, input_shape = c(1,100))%>%
+  time_distributed(layer_dense(units = 100))
+
+summary(lstm_model)
+lstm_model %>% compile(
+    loss = "mean_squared_error", 
+    optimizer = "adam"
+)
+
+lstm_model %>% fit(
+  x_train_lstm, x_train_lstm, 
+  epochs = 60,
+  verbose = 1
+)
+
+lstm_model %>% evaluate(x_test_lstm, x_test_lstm)
+
+
+a <- as.matrix(expand_dims(x_train_lstm[1,,],  axis = 0))
+
+bottlenect_model <- keras_model(inputs = lstm_model$input, outputs = get_layer(lstm_model, "lstm_107")$output)
+
+yhat_dr <- predict(bottlenect_model, x_train_lstm, verbose=0)
+
+
+recons_model <- keras_model(inputs = lstm_model$input, outputs = lstm_model$output)
+
+yhat <- predict(recons_model, x_train_lstm, verbose=0)
+
+plot(x_train_lstm[1,,], type = "l", col = "red")
+lines(yhat[1,,], type = "l", col = "green")
+lines(yhat_dr[1,,], type = "l", col = "blue")
+lines(FPCAdense_AP$xiEst[1,], type = "l", col = "black")
+lines(yhat_normal_ae[1,], type = "l", col = "blue")
+lines(intermediate_output[1,], type = "l", col = "purple")
+
+
+yhat_dr <- array_reshape(yhat_dr, c(10987, 32))
+
+ggplot(data.frame(PC5 = yhat_dr[,5], PC9 = yhat_dr[,9]), aes(x = PC5, y = PC9,col = train.ap$status )) + geom_point()
+
+View(yhat_dr)
+```
