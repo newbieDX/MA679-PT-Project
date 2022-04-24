@@ -51,7 +51,7 @@ model %>% compile(
 history <- model %>% fit(
   x = xtrain, 
   y = xtrain, 
-  epochs = 60,
+  epochs = 100,
   verbose = 0
 )
 
@@ -198,10 +198,10 @@ GRFs_train_lstm <- abind(x_train_ap_lstm,x_train_ml_lstm,x_train_v_lstm, along=2
 
 lstm_model <- keras_model_sequential() 
 lstm_model %>% 
-  layer_lstm(units = 64, activation = "relu",return_sequences = TRUE, input_shape = c(3, 100))%>%
+  layer_lstm(units = 128, activation = "relu",return_sequences = TRUE, input_shape = c(1, 100))%>%
   layer_lstm(units = 32, activation = "relu", return_sequences = FALSE)%>%
-  layer_repeat_vector(3)%>%
-  layer_lstm(units = 32,activation = "relu", return_sequences = TRUE)%>%
+  layer_repeat_vector(1)%>%
+  layer_lstm(units = 128,activation = "relu", return_sequences = TRUE)%>%
   layer_lstm(units = 64, activation = "relu", return_sequences = TRUE)%>%
   time_distributed(layer_dense(units = 100))
 
@@ -212,8 +212,8 @@ lstm_model %>% compile(
 )
 
 lstm_model %>% fit(
-  GRFs_train_lstm, GRFs_train_lstm, 
-  epochs = 60,
+  x_train_ap_lstm, x_train_ap_lstm, 
+  epochs = 100,
   verbose = 1
 )
 

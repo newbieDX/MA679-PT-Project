@@ -19,6 +19,7 @@ library(fdaoutlier)
 library(tidyverse)
 library(plotly)
 library(dplyr)
+library(RColorBrewer)
 
 
 combined_grf <- cbind(AP_GRF_stance_N, ML_GRF_stance_N, V_GRF_stance_N)
@@ -210,7 +211,7 @@ ytrain <- as.matrix(train.ap[c(1)])
 model_ap <- keras_model_sequential()
 model_ap %>%
   layer_dense(units = 76, activation = "relu", input_shape = ncol(xtrain)) %>%
-  layer_dense(units = 50, activation = "relu", name = "bottleneck") %>%
+  layer_dense(units = 55, activation = "relu", name = "bottleneck") %>%
   layer_dense(units = 76, activation = "relu") %>%
   layer_dense(units = ncol(xtrain))
 
@@ -230,10 +231,11 @@ model_ap %>% compile(
 history <- model_ap %>% fit(
   x = xtrain, 
   y = xtrain, 
-  epochs = 60,
-  verbose = 0
+  epochs = 100,
+  verbose = 0,
+  shuffle=TRUE,
+  validation_data= list(xtest, xtest)
 )
-
 
 
 plot(history)
@@ -248,10 +250,24 @@ hidden_layer_model_ap <- keras_model(inputs = model_ap$input, outputs = get_laye
 hidden_output_ap <- predict(hidden_layer_model_ap, xtrain)
 
 
-normal_ap_plot <- ggplot(data.frame(PC1 = hidden_output_ap[,1], PC2 = hidden_output_ap[,2]), aes(x = PC1, y = PC2, col = train.ap$status)) + geom_point()
+yhat_ap <- predict(model_ap, xtrain, verbose=0)
+
+plot(xtrain[1,], type = "l", col = "red")
+lines(yhat_ap[1,], type = "l", col = "green")
 
 
-normal_ap_plot
+plot(xtrain[1,], type = "l", col = "red", lwd = 3)
+lines(yhat_ap[1,], col = "green",type = 'l', lwd = 3)
+legend("topleft", legend = c("Original time series","Reconstructed time series"), col=c("red", "green"), pch=1)
+
+
+par(mfrow=c(2,1))
+ggplot(data.frame(PC1 = hidden_output_ap[,1], PC2 = hidden_output_ap[,2]), aes(x = PC1, y = PC2, col = train.ap$status)) + geom_point()+ggtitle("Normal Autoencoder hidden layer reconstruct data plot")
+
+
+ggplot(data.frame(PC1 = AP_stance_dr[,1], PC2 = AP_stance_dr[,2]), aes(x = PC1, y = PC2,col = train.ap$status)) + geom_point()+ggtitle("FPCA PCs reconstruct data plot")
+
+
 ```
 
 
@@ -259,8 +275,8 @@ Pretraining LSTM Autoencoders:
 data prepare:
 ```{r}
 library(abind)
-xtrain_ap <- as.matrix(train.AP)
-xtest_ap <- as.matrix(test.AP)
+xtrain_ap <- as.matrix(xtrain)
+xtest_ap <- as.matrix(xtest)
 x_train_ap_lstm = array_reshape(xtrain_ap, c(dim(xtrain_ap)[1],1, dim(xtrain_ap)[2]))
 x_test_ap_lstm = array_reshape(xtest_ap, c(dim(xtest_ap)[1],1, dim(xtest_ap)[2]))
 
@@ -280,52 +296,52 @@ GRFs_train_lstm <- abind(x_train_ap_lstm,x_train_ml_lstm,x_train_v_lstm, along=2
 
 
 ```{r}
+set.seed(1)
 lstm_model <- keras_model_sequential() 
 lstm_model %>% 
-  layer_lstm(units = 128, activation = "relu", return_sequences = TRUE, input_shape = c(3,100))%>%
+  layer_lstm(units = 128, activation = "relu", return_sequences = TRUE, input_shape = c(1,100))%>%
   layer_lstm(units = 32,activation = "relu", return_sequences = FALSE)%>%
-  layer_repeat_vector(3)%>%
+  layer_repeat_vector(1)%>%
   layer_lstm(units = 32, activation = "relu",return_sequences = TRUE)%>%
   layer_lstm(units = 128,activation = "relu", return_sequences = TRUE)%>%
   time_distributed(layer_dense(units = 100))
 
 summary(lstm_model)
+
 lstm_model %>% compile(
-    loss = "mean_squared_error", 
-    optimizer = "adam"
+  loss = "mean_squared_error", 
+  optimizer = "adam",
+  metrics = c('accuracy')
 )
 
-lstm_model %>% fit(
-  x_train_lstm, x_train_lstm, 
-  epochs = 60,
+history1 <- lstm_model %>% fit(
+  x_train_ap_lstm, x_train_ap_lstm, 
+  epochs = 100,
   verbose = 1
 )
+
 
 lstm_model %>% evaluate(x_test_lstm, x_test_lstm)
 
 
 a <- as.matrix(expand_dims(x_train_lstm[1,,],  axis = 0))
 
-bottlenect_model <- keras_model(inputs = lstm_model$input, outputs = get_layer(lstm_model, "lstm_107")$output)
+hidden_lstm_model <- keras_model(inputs = lstm_model$input, outputs = get_layer(lstm_model, "lstm_21")$output)
 
-yhat_dr <- predict(bottlenect_model, x_train_lstm, verbose=0)
+yhat_lstm <- predict(hidden_lstm_model, x_train_ap_lstm, verbose=0)
 
 
 recons_model <- keras_model(inputs = lstm_model$input, outputs = lstm_model$output)
 
-yhat <- predict(recons_model, x_train_lstm, verbose=0)
+yhat_lstm_recon <- predict(recons_model, x_train_ap_lstm, verbose=0)
 
-plot(x_train_lstm[1,,], type = "l", col = "red")
-lines(yhat[1,,], type = "l", col = "green")
-lines(yhat_dr[1,,], type = "l", col = "blue")
-lines(FPCAdense_AP$xiEst[1,], type = "l", col = "black")
-lines(yhat_normal_ae[1,], type = "l", col = "blue")
-lines(intermediate_output[1,], type = "l", col = "purple")
+plot(x_train_ap_lstm[1,,], type = "l", col = "red", lwd = 3)
+lines(yhat_lstm_recon[1,,], type = "l", col = "green", lwd = 3)
+legend("topleft", legend = c("Original time series","Reconstructed time series"), col=c("red", "green"), pch=1)
 
 
-yhat_dr <- array_reshape(yhat_dr, c(10987, 32))
+yhat_lstm <- array_reshape(yhat_lstm, c(10987, 32))
 
-ggplot(data.frame(PC5 = yhat_dr[,5], PC9 = yhat_dr[,9]), aes(x = PC5, y = PC9,col = train.ap$status )) + geom_point()
+ggplot(data.frame(PC1 = yhat_lstm[,1], PC7 = yhat_lstm[,7]), aes(x = PC1, y = PC7,col = train.ap$status )) + geom_point()+ggtitle("LSTM Autoencoder hidden layer reconstructed data point")
 
-View(yhat_dr)
 ```
