@@ -256,20 +256,37 @@ normal_ap_plot
 
 
 Pretraining LSTM Autoencoders:
+data prepare:
+```{r}
+library(abind)
+xtrain_ap <- as.matrix(train.AP)
+xtest_ap <- as.matrix(test.AP)
+x_train_ap_lstm = array_reshape(xtrain_ap, c(dim(xtrain_ap)[1],1, dim(xtrain_ap)[2]))
+x_test_ap_lstm = array_reshape(xtest_ap, c(dim(xtest_ap)[1],1, dim(xtest_ap)[2]))
+
+xtrain_ml <- as.matrix(train.ML)
+xtest_ml <- as.matrix(test.ML)
+x_train_ml_lstm = array_reshape(xtrain_ml, c(dim(xtrain_ml)[1],1, dim(xtrain_ml)[2]))
+x_test_ml_lstm = array_reshape(xtest_ml, c(dim(xtest_ml)[1],1, dim(xtest_ml)[2]))
+
+xtrain_v <- as.matrix(train.V)
+xtest_v <- as.matrix(test.V)
+x_train_v_lstm = array_reshape(xtrain_v, c(dim(xtrain_v)[1],1, dim(xtrain_v)[2]))
+x_test_v_lstm = array_reshape(xtest_v, c(dim(xtest_v)[1],1, dim(xtest_v)[2]))
+
+GRFs_train_lstm <- abind(x_train_ap_lstm,x_train_ml_lstm,x_train_v_lstm, along=2)
+```
+
+
 
 ```{r}
-library(kerasR)
-xtrain <- as.matrix(train.ap[c(2:101)])
-x_train_lstm = array_reshape(xtrain, c(dim(xtrain)[1], 1, dim(xtrain)[2]))
-x_test_lstm = array_reshape(xtest, c(dim(xtest)[1], 1, dim(xtest)[2]))
-
 lstm_model <- keras_model_sequential() 
 lstm_model %>% 
-  layer_lstm(units = 64, activation = "relu", return_sequences = TRUE, input_shape = c(1,100))%>%
-  layer_lstm(units = 32,activation = "relu", return_sequences = FALSE, input_shape = c(1,100))%>%
-  layer_repeat_vector(1)%>%
-  layer_lstm(units = 32, activation = "relu",return_sequences = TRUE, input_shape = c(1,100))%>%
-  layer_lstm(units = 64,activation = "relu", return_sequences = TRUE, input_shape = c(1,100))%>%
+  layer_lstm(units = 128, activation = "relu", return_sequences = TRUE, input_shape = c(3,100))%>%
+  layer_lstm(units = 32,activation = "relu", return_sequences = FALSE)%>%
+  layer_repeat_vector(3)%>%
+  layer_lstm(units = 32, activation = "relu",return_sequences = TRUE)%>%
+  layer_lstm(units = 128,activation = "relu", return_sequences = TRUE)%>%
   time_distributed(layer_dense(units = 100))
 
 summary(lstm_model)
