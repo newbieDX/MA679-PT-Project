@@ -322,7 +322,7 @@ checkpoint <- callback_model_checkpoint(
   verbose = 1
 )
 
-early_stopping <- callback_early_stopping(patience = 5)
+early_stopping <- callback_early_stopping(patience = 7)
 
 model_ml %>% fit(
   x = x_train.ml[y_train.ml == 0,], 
@@ -342,6 +342,9 @@ mse_train.ml <- apply((x_train.ml - pred_train.ml)^2, 1, sum)
 
 pred_test.ml <- predict(model_ml, x_test.ml)
 mse_test.ml <- apply((x_test.ml - pred_test.ml)^2, 1, sum)
+
+test <- cbind(y_test.ml, mse_test.ml)
+
 
 possible_k <- seq(0, 0.5, length.out = 100)
 precision <- sapply(possible_k, function(k) {
