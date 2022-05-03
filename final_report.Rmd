@@ -11,6 +11,17 @@ library(tidyverse)
 library(plotly)
 library(dplyr)
 library(RColorBrewer)
+library(readxl)
+```
+
+
+```{r}
+#load data:
+ID_info <- read_excel("/Users/xuchen/Desktop/MA679/PTProject_Data/IDinfo.xls")
+# Time-normalized data
+AP_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/AP_GRF_stance_N.csv", header = FALSE)
+ML_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/ML_GRF_stance_N.csv", header = FALSE)
+V_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/V_GRF_stance_N.csv", header = FALSE)
 ```
 
 Abstract:
@@ -22,25 +33,65 @@ Introduction:
 
 
 
-Explotary data analysis
-The first step: dataset select
+Explortary data analysis:
 
-select AP_GRFs, ML_GRFs, V_GRFs, COPx, COPy
-
-detect outliers for 5 time normalized dataset and label them
+Reconstruct the time normalized force plot:
 
 ```{r}
+mat_ap <- as.matrix(AP_GRF_stance_N)
+mat_ml <- as.matrix(ML_GRF_stance_N)
+mat_v <- as.matrix(V_GRF_stance_N)
+
+color = rgb(runif(15696,0,1),runif(15696,0,1), runif(15696,0,1))
+
+ml_ts <- function(df){
+  plot(df[1,], col = color[1], type = 'l', lwd = 1, ylim = c(-150,200), xlab = "Time point", ylab = "ML_GRF_stance_N")
+  for (i in 2:nrow(df)) {
+    lines(df[i,], col = color1[i], type = 'l', lwd = 1)
+  }
+}
+
+ap_ts <- function(df){
+  plot(df[1,], col = color[1], type = 'l', lwd = 1, ylim = c(-400,400), xlab = "Time point", ylab = "AP_GRF_stance_N")
+  for (i in 2:nrow(df)) {
+    lines(df[i,], col = color1[i], type = 'l', lwd = 1)
+  }
+}
+
+v_ts <- function(df){
+  plot(df[1,], col = color[1], type = 'l', lwd = 1, ylim = c(0,2000), xlab = "Time point", ylab = "V_GRF_stance_N")
+  for (i in 2:nrow(df)) {
+    lines(df[i,], col = color1[i], type = 'l', lwd = 1)
+  }
+}
+
+```
+
+The first step: dataset select
+
+select AP_GRFs, ML_GRFs, V_GRFs
+
+```{r}
+ap_plot <- ap_ts(mat_ap)
+```
+
+```{r}
+ml_plot <- ml_ts(mat_ml)
+```
+
+```{r}
+v_plot <- v_ts(mat_v)
+```
 
 
-combined_grf <- cbind(AP_GRF_stance_N, ML_GRF_stance_N, V_GRF_stance_N)
+Detect outliers for all 3 time normalized GRFs and label them
 
+```{r}
 
 ap_ms <- msplot(dts = AP_GRF_stance_N, plot = F)
 ap_ms$outliers
 
 ap_outlier_id <- ap_ms$outliers %>% as.data.frame()
-
-
 
 ap_grf <- AP_GRF_stance_N %>%
   mutate(index = row_number())
@@ -60,32 +111,11 @@ ap_grf <- ap_grf[c(102, 1:100)]
 
 ap_outlier <- subset(ap_grf, ap_grf$status == "Outlier")
 
-df_2 <- as.matrix(subset(ap_grf, ap_grf$status == "Good")[c(-1)])
-
-df_1 <- as.matrix(ap_outlier[c(-1)])
-color = rgb(runif(2083,0,1),runif(2083,0,1), runif(2083,0,1))
-
-
-plot(df_1[1,], col = color[1], type = 'l', lwd = 1, ylim = c(-400,400))
-for (i in 2:nrow(df_1)) {
-  lines(df_1[i,], col = color[i], type = 'l', lwd = 1)
-}
-
-color1 = rgb(runif(13613,0,1),runif(13613,0,1), runif(13613,0,1))
-
-
-plot(df_2[1,], col = color1[1], type = 'l', lwd = 1, ylim = c(-300,300))
-for (i in 2:nrow(df_2)) {
-  lines(df_2[i,], col = color1[i], type = 'l', lwd = 1)
-}
-
-
 
 
 ml_ms <- msplot(dts = ML_GRF_stance_N, plot = F)
-ml_ms$outliers
 
-ml_outlier_id <- ml_ms$outliers %>% as.data.frame()
+ml_outlier_id <- ml_ms$outliers
 
 ml_grf <- ML_GRF_stance_N %>%
   mutate(index = row_number())
@@ -94,10 +124,10 @@ ml_grf <- ML_GRF_stance_N %>%
 
 for (i in 1:nrow(ml_grf)) {
   if (ml_grf$index[i] %in% ml_outlier_id == TRUE) {
-    ml_grf$status[i] = "Outlier"
+    ml_grf$status[i] = 1
   }
   if (ml_grf$index[i] %in% ml_outlier_id == FALSE) {
-    ml_grf$status[i] = "Good"
+    ml_grf$status[i] = 0
   }
 }
 
@@ -114,38 +144,11 @@ grf_outlier_id <- inner_join(ap_outlier_id, ml_outlier_id, by = ".")
 grf_outlier_id <- inner_join(grf_outlier_id, v_outlier_id, by = ".")
 
 
-
-
 ```
 
+Baseline model: Functional PCA
 
-Normal PCA
-
-```{r}
-library(devtools)
-library(ggfortify)
-
-dt.1 <-  sort(sample(nrow(ap_grf), nrow(ap_grf)*.7))
-train.ap<-ap_grf[dt.1,]
-test.ap<-ap_grf[-dt.1,]
-
-
-ap_grf.pca <- prcomp(train.ap[c(2:101)])
-
-pca_ap_plot <- autoplot(ap_grf.pca,
-         loadings = FALSE, loadings.colour = 'blue',
-         loadings.label = FALSE, loadings.label.size = 3,
-         data = train.ap,
-         colour = "status")
-
-summary(ap_grf.pca)
-
-pca_ap_plot
-
-```
-
-
-Functional PCA
+data processing
 
 ```{r}
 dt.1 <-  sort(sample(nrow(ap_grf), nrow(ap_grf)*.7))
@@ -157,12 +160,6 @@ test.ML<-ML_GRF_stance_N[-dt.1,]
 
 train.V<-V_GRF_stance_N[dt.1,]
 test.V<-V_GRF_stance_N[-dt.1,]
-
-train.COPx<-COPx_stance[dt.1,]
-test.COPx<-COPx_stance[-dt.1,]
-
-train.COPy<-COPy_stance[dt.1,]
-test.COPy<-COPy_stance[-dt.1,]
 
 train.ID <-ID_info[dt.1,]
 test.ID <-ID_info[-dt.1,]
@@ -182,8 +179,6 @@ data_pre_func <- function(df1, df2){
 try <- data_pre_func(train.ID, train.fpca.AP)
 try2 <- data_pre_func(train.ID, train.ML)
 try3 <- data_pre_func(train.ID, train.V)
-try4 <- data_pre_func(train.ID, train.COPx)
-try5 <- data_pre_func(train.ID, train.COPy)
 ```
 
 
@@ -247,45 +242,127 @@ fpca_ap_plot
 ```
 
 
-Normal autoencoder
+Normal auto-encoder
+
+We created 2 functions to help us. The first one gets descriptive statistics about the dataset that are used for scaling. Then we have a function to perform the min-max scaling.
+
+```{r}
+library(purrr)
+
+#' Gets descriptive statistics for every variable in the dataset.
+get_desc <- function(x) {
+  map(x, ~list(
+    min = min(.x),
+    max = max(.x),
+    mean = mean(.x),
+    sd = sd(.x)
+  ))
+} 
+
+#' Given a dataset and normalization constants it will create a min-max normalized
+#' version of the dataset.
+normalization_minmax <- function(x, desc) {
+  map2_dfc(x, desc, ~(.x - .y$min)/(.y$max - .y$min))
+}
+```
+
 
 ```{r}
 
-dt.ap <-  sort(sample(nrow(ap_grf), nrow(ap_grf)*.7))
-df_train.ap<-ap_grf[dt.ap,]
-df_test.ap<-ap_grf[-dt.ap,]
+library(keras)
+library(caret)
+
+K <- keras::backend()
+
+dt.ml <-  sort(sample(nrow(ml_grf), nrow(ml_grf)*.7))
+df_train.ml<-ml_grf[dt.ap,]
+df_test.ml<-ml_grf[-dt.ap,]
 
 
-x_train <- df_train.ap %>%
+desc <- df_train.ml %>% 
+  select(-status) %>% 
+  get_desc()
+
+x_train.ml <- df_train.ml %>%
   select(-status) %>%
+  normalization_minmax(desc) %>%
   as.matrix()
 
-x_test <- df_test.ap %>%
+x_test.ml <- df_test.ml %>%
   select(-status) %>%
+  normalization_minmax(desc) %>%
   as.matrix()
 
-y_train <- df_train.ap$status
-y_test <- df_test.ap$status
+y_train.ml <- df_train.ml$status
+y_test.ml <- df_test.ml$status
 
-model_ap <- keras_model_sequential()
-model_ap %>%
-  layer_dense(units = 50, activation = "relu", input_shape = ncol(x_train)) %>%
+model_ml <- keras_model_sequential()
+model_ml %>%
+  layer_dense(units = 50, activation = "relu", input_shape = ncol(x_train.ml)) %>%
   layer_dense(units = 35, activation = "relu", name = "bottleneck") %>%
   layer_dense(units = 50, activation = "relu") %>%
-  layer_dense(units = ncol(x_train))
+  layer_dense(units = ncol(x_train.ml))
 
 # summar of model
-summary(model_ap) 
+summary(model_ml) 
 
 
 # compile model
-model_ap %>% compile(
+model_ml %>% compile(
   loss = "mean_squared_error", 
   optimizer = "adam",
   metrics = c('accuracy')
 )
 
 
+checkpoint <- callback_model_checkpoint(
+  filepath = "model.hdf5", 
+  save_best_only = TRUE, 
+  period = 1,
+  verbose = 1
+)
+
+early_stopping <- callback_early_stopping(patience = 5)
+
+model_ml %>% fit(
+  x = x_train.ml[y_train.ml == 0,], 
+  y = x_train.ml[y_train.ml == 0,], 
+  epochs = 100, 
+  batch_size = 32,
+  validation_data = list(x_test.ml[y_test.ml == 0,], x_test.ml[y_test.ml == 0,]), 
+  callbacks = list(checkpoint, early_stopping)
+)
+
+loss <- evaluate(model_ml, x = x_test.ml[y_test.ml == 0,], y = x_test.ml[y_test.ml == 0,])
+loss
+
+
+pred_train.ml <- predict(model_ml, x_train.ml)
+mse_train.ml <- apply((x_train.ml - pred_train.ml)^2, 1, sum)
+
+pred_test.ml <- predict(model_ml, x_test.ml)
+mse_test.ml <- apply((x_test.ml - pred_test.ml)^2, 1, sum)
+
+possible_k <- seq(0, 0.5, length.out = 100)
+precision <- sapply(possible_k, function(k) {
+  predicted_class <- as.numeric(mse_test.ml > k)
+  sum(predicted_class == 1 & y_test.ml == 1)/sum(predicted_class)
+})
+
+qplot(possible_k, precision, geom = "line") +
+  labs(x = "Threshold", y = "Precision")
+
+
+recall <- sapply(possible_k, function(k) {
+  predicted_class <- as.numeric(mse_test.ml > k)
+  sum(predicted_class == 1 & y_test.ml == 1)/sum(y_test.ml)
+})
+
+qplot(possible_k, recall, geom = "line") +
+  labs(x = "Threshold", y = "Recall")
+```
+
+```{r}
 # fit model
 
 history <- model_ap %>% fit(
@@ -312,10 +389,10 @@ hidden_output_ap <- predict(hidden_layer_model_ap, xtrain)
 hidden_output_ap_dt <- as.data.frame(hidden_output_ap)
 
 
-yhat_ap <- predict(model_ap, xtrain, verbose=0)
+yhat_ml <- predict(model_ap, x_train.ml, verbose=0)
 
-plot(xtrain[1,], type = "l", col = "red")
-lines(yhat_ap[1,], type = "l", col = "green")
+plot(x_train.ml[1,], type = "l", col = "red")
+lines(yhat_ml[1,], type = "l", col = "green")
 
 
 plot(xtrain[1,], type = "l", col = "red", lwd = 3)
