@@ -53,15 +53,30 @@ data_pre_func <- function(df1, df2){
   return(df_pre)
 }
 
+data_pre_func_rn <- function(df1, df2){
+  df <- cbind(df1, df2)
+  df3 <- df %>% pivot_longer(-c(ID, KNEE, TRIAL, tr_length,status), names_to = "time", values_to = "force")%>%
+    mutate(new = paste(ID, "-",KNEE, "-",TRIAL)) 
+  
+  t <- rep(seq(0,100,length.out = 100),nrow(df))
+  
+  df_pre <- cbind(df3, t)
+  return(df_pre)
+}
+
+ap_outlier_try <- data_pre_func_rn(ID_info, ap_grf)
+
+ap_outlier <- subset(ap_outlier_try, ap_outlier_try$status == "Outlier")
+
 try <- data_pre_func(train.ID, train.AP)
 try2 <- data_pre_func(train.ID, train.ML)
 try3 <- data_pre_func(train.ID, train.V)
 try4 <- data_pre_func(train.ID, train.COPx)
 try5 <- data_pre_func(train.ID, train.COPy)
 
-# p_try <- ggplot(try, aes(x = t, y = force, group = new, col = new)) +
-#   geom_line()
-# p_try
+p_try <- ggplot(ap_outlier_try, aes(x = t, y = force, group = new, col = new)) +
+  geom_line()
+p_try
 ```
 
 Do FPCA for all 5 time normalized dfs:
