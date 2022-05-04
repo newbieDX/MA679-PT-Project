@@ -9,7 +9,8 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE,out.width="0.9\\linewidth",dev="pdf",fig.align  = 'center')
+knitr::opts_chunk$set(warning = F,message = F,echo=F,highlight=F)
+knitr::opts_chunk$set(fig.width = 12, fig.height = 4,fig.align = "center")
 pacman::p_load(
   "fda.usc",
   "fdaoutlier",
@@ -35,18 +36,18 @@ ML_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/ML_GRF_s
 V_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/V_GRF_stance_N.csv", header = FALSE)
 ```
 
-Abstract:
+##Abstract:
 
+    Our client is studying osteoarthritis of the knees by imaging subjects’ walking motion over a series of pressure plates. We reconstructed the force trend with the time series data collected from the pressure plates to have a general insight about the experiment. We then tried to find new important identifiers using different unsupervised dimension reduction models: Functional PCA and traditional Autoencoder. In order to make the model we built more practical, we trained our Autoencoder model to detect outliers and used Precision-Recall curve to determine the threshold. This report consists of four main sections: Introduction, Data and Methods, Model comparison, and Discussion. 
 
+##Introduction:
 
+    Mechanical loading has been implicated in knee osteoarthritis pathogenesis, suggesting that interventions aimed at changing joint loading may be key to reducing the burden of knee osteoarthritis. Our client from the movement & applied imaging lab of Boston University conducted an experiment to study osteoarthritis of the knees by imaging participants’ walking motion over three pieces of pressure plates. During the motion, the pressure plates measure three forces and three moment components. Our clients manually extracted some potential features. What we need to do is try different machine learning methods to reconstruct the motion and see if we can use some new features to describe the motions and study osteoarthritis from a new perspective.
+    
 
-Introduction:
+##Exploratory data analysis:
 
-
-
-Explortary data analysis:
-
-The first step: datasets select
+###The first step: datasets select
 
 select AP_GRFs, ML_GRFs, V_GRFs
 
@@ -81,7 +82,7 @@ v_ts <- function(df){
 ```
 
 
-Reconstruct the time normalized force plot:
+###Reconstruct the time normalized force plot:
 
 ```{r}
 ap_plot <- ap_ts(mat_ap)
@@ -96,7 +97,7 @@ v_plot <- v_ts(mat_v)
 ```
 
 
-Detect outliers for all 3 time normalized GRFs and label them
+Detect outliers for all 3 time normalized GRFs and label them 1 as outliers and 0 as normal.
 
 ```{r}
 
@@ -165,9 +166,9 @@ for (i in 1:nrow(v_grf)) {
 v_grf <- v_grf[c(102, 1:100)]
 ```
 
-Baseline model: Functional PCA
+##Baseline model: Functional PCA
 
-data processing
+###data processing
 
 ```{r}
 data_pre_func <- function(df1, df2){
@@ -188,6 +189,7 @@ v_fpca <- data_pre_func(ID_info, V_GRF_stance_N)
 
 
 Do FPCA for all 5 time normalized dfs:
+
 ```{r}
 L_AP <- MakeFPCAInputs(ap_fpca$new, ap_fpca$t, ap_fpca$force)
 FPCAdense_AP <- FPCA(L_AP$Ly, L_AP$Lt)
@@ -224,9 +226,9 @@ par(mfrow=c(1,1))
 ```
 
 
-Tradictional auto-encoder
+##Tradictional auto-encoder
 
-We created 2 functions to help us. The first one gets descriptive statistics about the dataset that are used for scaling. Then we have a function to perform the min-max scaling.
+    We created 2 functions to help us. The first one gets descriptive statistics about the dataset that are used for scaling. Then we have a function to perform the min-max scaling.
 
 ```{r}
 
