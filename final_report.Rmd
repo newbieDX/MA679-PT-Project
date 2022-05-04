@@ -1,17 +1,28 @@
 ---
-title: "Untitled"
-output: html_document
+title: "SAR PT Project Final Report"
+subtitle: "Osteoarthritis Research Analysis"
+author: "Boyu Chen, Chen Xu"
+date: "May 6, 2022"
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-library(fda.usc)
-library(fdaoutlier)
-library(tidyverse)
-library(plotly)
-library(dplyr)
-library(RColorBrewer)
-library(readxl)
+knitr::opts_chunk$set(echo = TRUE,out.width="0.9\\linewidth",dev="pdf",fig.align  = 'center')
+pacman::p_load(
+  "fda.usc",
+  "fdaoutlier",
+  "tidyverse",
+  "fda",
+  "dplyr",
+  "fdapace",
+  "plotly",
+  "readxl",
+  "purrr",
+  "keras",
+  "caret"
+)
 ```
 
 
@@ -35,7 +46,9 @@ Introduction:
 
 Explortary data analysis:
 
-Reconstruct the time normalized force plot:
+The first step: datasets select
+
+select AP_GRFs, ML_GRFs, V_GRFs
 
 ```{r}
 mat_ap <- as.matrix(AP_GRF_stance_N)
@@ -67,9 +80,8 @@ v_ts <- function(df){
 
 ```
 
-The first step: dataset select
 
-select AP_GRFs, ML_GRFs, V_GRFs
+Reconstruct the time normalized force plot:
 
 ```{r}
 ap_plot <- ap_ts(mat_ap)
@@ -89,9 +101,8 @@ Detect outliers for all 3 time normalized GRFs and label them
 ```{r}
 
 ap_ms <- msplot(dts = AP_GRF_stance_N, plot = F)
-ap_ms$outliers
 
-ap_outlier_id <- ap_ms$outliers %>% as.data.frame()
+ap_outlier_id <- ap_ms$outliers
 
 ap_grf <- AP_GRF_stance_N %>%
   mutate(index = row_number())
@@ -100,17 +111,14 @@ ap_grf <- AP_GRF_stance_N %>%
 
 for (i in 1:nrow(ap_grf)) {
   if (ap_grf$index[i] %in% ap_outlier_id == TRUE) {
-    ap_grf$status[i] = "Outlier"
+    ap_grf$status[i] = 1
   }
   if (ap_grf$index[i] %in% ap_outlier_id == FALSE) {
-    ap_grf$status[i] = "Good"
+    ap_grf$status[i] = 0
   }
 }
 
 ap_grf <- ap_grf[c(102, 1:100)]
-
-ap_outlier <- subset(ap_grf, ap_grf$status == "Outlier")
-
 
 
 ml_ms <- msplot(dts = ML_GRF_stance_N, plot = F)
@@ -136,14 +144,25 @@ ml_grf <- ml_grf[c(102, 1:100)]
 
 
 v_ms <- msplot(dts = V_GRF_stance_N, plot = F)
-v_ms$outliers
 
-v_outlier_id <- v_ms$outliers %>% as.data.frame()
-
-grf_outlier_id <- inner_join(ap_outlier_id, ml_outlier_id, by = ".")
-grf_outlier_id <- inner_join(grf_outlier_id, v_outlier_id, by = ".")
+v_outlier_id <- v_ms$outliers
 
 
+v_grf <- V_GRF_stance_N %>%
+  mutate(index = row_number())
+
+# label the outliers
+
+for (i in 1:nrow(v_grf)) {
+  if (v_grf$index[i] %in% v_outlier_id == TRUE) {
+    v_grf$status[i] = 1
+  }
+  if (v_grf$index[i] %in% v_outlier_id == FALSE) {
+    v_grf$status[i] = 0
+  }
+}
+
+v_grf <- v_grf[c(102, 1:100)]
 ```
 
 Baseline model: Functional PCA
@@ -151,20 +170,6 @@ Baseline model: Functional PCA
 data processing
 
 ```{r}
-dt.1 <-  sort(sample(nrow(ap_grf), nrow(ap_grf)*.7))
-train.fpca.AP<-AP_GRF_stance_N[dt.1,]
-test.fpca.AP<-AP_GRF_stance_N[-dt.1,]
-
-train.ML<-ML_GRF_stance_N[dt.1,]
-test.ML<-ML_GRF_stance_N[-dt.1,]
-
-train.V<-V_GRF_stance_N[dt.1,]
-test.V<-V_GRF_stance_N[-dt.1,]
-
-train.ID <-ID_info[dt.1,]
-test.ID <-ID_info[-dt.1,]
-
-
 data_pre_func <- function(df1, df2){
   df <- cbind(df1, df2)
   df3 <- df %>% pivot_longer(-c(ID, KNEE, TRIAL, tr_length), names_to = "time", values_to = "force")%>%
@@ -176,78 +181,54 @@ data_pre_func <- function(df1, df2){
   return(df_pre)
 }
 
-try <- data_pre_func(train.ID, train.fpca.AP)
-try2 <- data_pre_func(train.ID, train.ML)
-try3 <- data_pre_func(train.ID, train.V)
+ap_fpca <- data_pre_func(ID_info, AP_GRF_stance_N)
+ml_fpca <- data_pre_func(ID_info, ML_GRF_stance_N)
+v_fpca <- data_pre_func(ID_info, V_GRF_stance_N)
 ```
 
 
 Do FPCA for all 5 time normalized dfs:
 ```{r}
-L_AP <- MakeFPCAInputs(try$new, try$t, try$force)
+L_AP <- MakeFPCAInputs(ap_fpca$new, ap_fpca$t, ap_fpca$force)
 FPCAdense_AP <- FPCA(L_AP$Ly, L_AP$Lt)
 
 # Plot the FPCA object
 plot(FPCAdense_AP)
 
-
-# Select the first PCs:
-AP_stance_dr <- FPCAdense_AP$xiEst
-colnames(AP_stance_dr) <- c('AP_FPC1', 
-                            'AP_FPC2', 
-                            'AP_FPC3',
-                            'AP_FPC4',
-                            'AP_FPC5', 
-                            'AP_FPC6', 
-                            'AP_FPC7',
-                            'AP_FPC8',
-                            'AP_FPC9',
-                            'AP_FPC10',
-                            'AP_FPC11',
-                            'AP_FPC12')
-
-
-
-
-fpca_ap_ms <- msplot(dts = AP_stance_dr, plot = F)
-fpca_ap_ms$outliers
-
-fpca_ap_outlier_id <- fpca_ap_ms$outliers
-
-fpca_ap_grf <- AP_stance_dr %>% as.data.frame() %>%
-  mutate(index = row_number())
-
-# label the outliers
-
-for (i in 1:nrow(fpca_ap_grf)) {
-  if (fpca_ap_grf$index[i] %in% fpca_ap_outlier_id == TRUE) {
-    fpca_ap_grf$status[i] = "Outlier"
-  }
-  if (fpca_ap_grf$index[i] %in% fpca_ap_outlier_id == FALSE) {
-    fpca_ap_grf$status[i] = "Good"
-  }
-}
-
-
-fpc_ap.pca <- prcomp(fpca_ap_grf[1:12])
-
-fpca_ap_plot <- autoplot(fpc_ap.pca,
-         loadings = FALSE, loadings.colour = 'blue',
-         loadings.label = FALSE, loadings.label.size = 3,
-         data = fpca_ap_grf,
-         colour = "status")
-
-
-fpca_ap_plot
+par(mfrow=c(1,1))
+CreateOutliersPlot(FPCAdense_AP, optns = list(K = 12, variant = 'KDE'))
 ```
 
 
-Normal auto-encoder
+```{r}
+L_ML <- MakeFPCAInputs(ml_fpca$new, ml_fpca$t, ml_fpca$force)
+FPCAdense_ML <- FPCA(L_ML$Ly, L_ML$Lt)
+
+# Plot the FPCA object
+plot(FPCAdense_ML)
+
+par(mfrow=c(1,1))
+  CreateOutliersPlot(FPCAdense_ML, optns = list(K = 15, variant = 'KDE'))
+```
+
+
+```{r}
+L_V <- MakeFPCAInputs(v_fpca$new, v_fpca$t, v_fpca$force)
+FPCAdense_V <- FPCA(L_V$Ly, L_V$Lt)
+
+# Plot the FPCA object
+plot(FPCAdense_V)
+
+par(mfrow=c(1,1))
+  CreateOutliersPlot(FPCAdense_V, optns = list(K = 8, variant = 'KDE'))
+```
+
+
+Tradictional auto-encoder
 
 We created 2 functions to help us. The first one gets descriptive statistics about the dataset that are used for scaling. Then we have a function to perform the min-max scaling.
 
 ```{r}
-library(purrr)
 
 #' Gets descriptive statistics for every variable in the dataset.
 get_desc <- function(x) {
@@ -267,10 +248,11 @@ normalization_minmax <- function(x, desc) {
 ```
 
 
-```{r}
+Create traditional Autoencoder model for outlier detection
 
-library(keras)
-library(caret)
+Select ML_GRF_stance_N as example
+
+```{r}
 
 K <- keras::backend()
 
@@ -299,19 +281,21 @@ y_test.ml <- df_test.ml$status
 model_ml <- keras_model_sequential()
 model_ml %>%
   layer_dense(units = 50, activation = "relu", input_shape = ncol(x_train.ml)) %>%
-  layer_dense(units = 35, activation = "relu", name = "bottleneck") %>%
+  layer_dense(units = 30, activation = "relu", name = "bottleneck") %>%
   layer_dense(units = 50, activation = "relu") %>%
   layer_dense(units = ncol(x_train.ml))
+
+
 
 # summar of model
 summary(model_ml) 
 
 
+
 # compile model
 model_ml %>% compile(
   loss = "mean_squared_error", 
-  optimizer = "adam",
-  metrics = c('accuracy')
+  optimizer = "adam"
 )
 
 
@@ -322,7 +306,7 @@ checkpoint <- callback_model_checkpoint(
   verbose = 1
 )
 
-early_stopping <- callback_early_stopping(patience = 7)
+early_stopping <- callback_early_stopping(patience = 5)
 
 model_ml %>% fit(
   x = x_train.ml[y_train.ml == 0,], 
@@ -343,9 +327,6 @@ mse_train.ml <- apply((x_train.ml - pred_train.ml)^2, 1, sum)
 pred_test.ml <- predict(model_ml, x_test.ml)
 mse_test.ml <- apply((x_test.ml - pred_test.ml)^2, 1, sum)
 
-test <- cbind(y_test.ml, mse_test.ml)
-
-
 possible_k <- seq(0, 0.5, length.out = 100)
 precision <- sapply(possible_k, function(k) {
   predicted_class <- as.numeric(mse_test.ml > k)
@@ -363,127 +344,29 @@ recall <- sapply(possible_k, function(k) {
 
 qplot(possible_k, recall, geom = "line") +
   labs(x = "Threshold", y = "Recall")
+
+qplot(recall, precision, geom = "line")+
+  labs(x = "Recall", y = "Precision")
+
+fmeasure <- (2 * precision * recall) / (precision + recall)
+
+which.max(fmeasure)
+
+possible_k[which.max(fmeasure)]
 ```
 
+
+Model Reconstruction check
 ```{r}
-# fit model
-
-history <- model_ap %>% fit(
-  x = x_train, 
-  y = x_train, 
-  epochs = 100,
-  verbose = 0,
-  shuffle=TRUE,
-  validation_data= list(x_test, x_test)
-)
-
-
-plot(history)
-
-
-# evaluate the performance of the model
-mse.ae.ap <- evaluate(model_ap, x_test, x_test)
-mse.ae.ap
-
-hidden_layer_model_ap <- keras_model(inputs = model_ap$input, outputs = get_layer(model_ap, "bottleneck")$output)
-
-hidden_output_ap <- predict(hidden_layer_model_ap, xtrain)
-
-hidden_output_ap_dt <- as.data.frame(hidden_output_ap)
-
-
-yhat_ml <- predict(model_ap, x_train.ml, verbose=0)
-
 plot(x_train.ml[1,], type = "l", col = "red")
-lines(yhat_ml[1,], type = "l", col = "green")
-
-
-plot(xtrain[1,], type = "l", col = "red", lwd = 3)
-lines(yhat_ap[1,], col = "green",type = 'l', lwd = 3)
-legend("topleft", legend = c("Original time series","Reconstructed time series"), col=c("red", "green"), pch=1)
-
-
-par(mfrow=c(2,1))
-ggplot(data.frame(PC1 = hidden_output_ap[,1], PC2 = hidden_output_ap[,2]), aes(x = PC1, y = PC2, col = train.ap$status)) + geom_point()+ggtitle("Normal Autoencoder hidden layer reconstruct data plot")
-
-
-ggplot(data.frame(PC1 = AP_stance_dr[,1], PC2 = AP_stance_dr[,2]), aes(x = PC1, y = PC2,col = train.ap$status)) + geom_point()+ggtitle("FPCA PCs reconstruct data plot")
-
-
+lines(pred_train.ml[1,], type = "l", col = "green")
 ```
 
 
-Pretraining LSTM Autoencoders:
-data prepare:
-```{r}
-library(abind)
-xtrain_ap <- as.matrix(xtrain)
-xtest_ap <- as.matrix(xtest)
-x_train_ap_lstm = array_reshape(xtrain_ap, c(dim(xtrain_ap)[1],1, dim(xtrain_ap)[2]))
-x_test_ap_lstm = array_reshape(xtest_ap, c(dim(xtest_ap)[1],1, dim(xtest_ap)[2]))
-
-xtrain_ml <- as.matrix(train.ML)
-xtest_ml <- as.matrix(test.ML)
-x_train_ml_lstm = array_reshape(xtrain_ml, c(dim(xtrain_ml)[1],1, dim(xtrain_ml)[2]))
-x_test_ml_lstm = array_reshape(xtest_ml, c(dim(xtest_ml)[1],1, dim(xtest_ml)[2]))
-
-xtrain_v <- as.matrix(train.V)
-xtest_v <- as.matrix(test.V)
-x_train_v_lstm = array_reshape(xtrain_v, c(dim(xtrain_v)[1],1, dim(xtrain_v)[2]))
-x_test_v_lstm = array_reshape(xtest_v, c(dim(xtest_v)[1],1, dim(xtest_v)[2]))
-
-GRFs_train_lstm <- abind(x_train_ap_lstm,x_train_ml_lstm,x_train_v_lstm, along=2)
-```
+Results:
 
 
 
-```{r}
-set.seed(1)
-lstm_model <- keras_model_sequential() 
-lstm_model %>% 
-  layer_lstm(units = 128, activation = "relu", return_sequences = TRUE, input_shape = c(1,100))%>%
-  layer_lstm(units = 32,activation = "relu", return_sequences = FALSE)%>%
-  layer_repeat_vector(1)%>%
-  layer_lstm(units = 32, activation = "relu",return_sequences = TRUE)%>%
-  layer_lstm(units = 128,activation = "relu", return_sequences = TRUE)%>%
-  time_distributed(layer_dense(units = 100))
 
-summary(lstm_model)
+Discussion
 
-lstm_model %>% compile(
-  loss = "mean_squared_error", 
-  optimizer = "adam",
-  metrics = c('accuracy')
-)
-
-history1 <- lstm_model %>% fit(
-  x_train_ap_lstm, x_train_ap_lstm, 
-  epochs = 100,
-  verbose = 1
-)
-
-
-lstm_model %>% evaluate(x_test_lstm, x_test_lstm)
-
-
-a <- as.matrix(expand_dims(x_train_lstm[1,,],  axis = 0))
-
-hidden_lstm_model <- keras_model(inputs = lstm_model$input, outputs = get_layer(lstm_model, "lstm_21")$output)
-
-yhat_lstm <- predict(hidden_lstm_model, x_train_ap_lstm, verbose=0)
-
-
-recons_model <- keras_model(inputs = lstm_model$input, outputs = lstm_model$output)
-
-yhat_lstm_recon <- predict(recons_model, x_train_ap_lstm, verbose=0)
-
-plot(x_train_ap_lstm[1,,], type = "l", col = "red", lwd = 3)
-lines(yhat_lstm_recon[1,,], type = "l", col = "green", lwd = 3)
-legend("topleft", legend = c("Original time series","Reconstructed time series"), col=c("red", "green"), pch=1)
-
-
-yhat_lstm <- array_reshape(yhat_lstm, c(10987, 32))
-
-ggplot(data.frame(PC1 = yhat_lstm[,1], PC7 = yhat_lstm[,7]), aes(x = PC1, y = PC7,col = train.ap$status )) + geom_point()+ggtitle("LSTM Autoencoder hidden layer reconstructed data point")
-
-```
