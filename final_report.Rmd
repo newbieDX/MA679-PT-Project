@@ -268,10 +268,32 @@ par(mfrow=c(1,1))
 
 
 
+
+## Reconstruction with functional PCA principle components. 
+```{r}
+
+```
+
 ##Tradictional auto-encoder
+Autoencoders are an unsupervised learning technique in which we leverage neural networks for the task of representation learning. Specifically, we'll design a neural network architecture such that we impose a bottleneck in the network which forces a compressed knowledge representation of the original input. If the input features were each independent of one another, this compression and subsequent reconstruction would be a very difficult task. However, if some sort of structure exists in the data (ie. correlations between input features), this structure can be learned and consequently leveraged when forcing the input through the network's bottleneck.
+Autoencoders consists of 4 main parts:
+
+1- Encoder: In which the model learns how to reduce the input dimensions and compress the input data into an encoded representation.
+
+2- Bottleneck: which is the layer that contains the compressed representation of the input data. This is the lowest possible dimensions of the input data.
+
+3- Decoder: In which the model learns how to reconstruct the data from the encoded representation to be as close to the original input as possible.
+
+4- Reconstruction Loss: This is the method that measures measure how well the decoder is performing and how close the output is to the original input.
 
 
-    We created 2 functions to help us. The first one gets descriptive statistics about the dataset that are used for scaling. Then we have a function to perform the min-max scaling.
+Because our project is focusing on unsupervised learning, we are lack of outcomes and labels. As a result, we suppose the outlierr may represent participant with some abnormal with knees when they participated in the experiment.
+
+Because there are three peaks in the previous EDA plot we got, so we think medial-lateral ground reaction force can get the identifier is more representative. In addition, medial-lateral ground reaction force is a horizontal force which can represent the stability of two knees. In other words this force can be identifies the participant with  Osteoarthritis.
+
+First, We created 2 functions to help us. The first one gets descriptive statistics about the dataset that are used for scaling. Then we have a function to perform the min-max scaling. As we know there are 100 data points for one curve, so for the first layer of autoencoder we select half of the original number of features which is 50. And for the bottle neck layer we choose 60% of the number of the first layers units. 
+
+We split the training data and test data with odds 7:3. To compare the reconstruction of our model performance, we use mean squared error as our loss function. According to the previous table, the persentage of outliers for medial-lateral ground reaction Force is 13.7$%$ which means the ourdatset is imbalanced. So we use precision-recall curve to find the optimal threshold to classify the outliers.
 
 ```{r}
 
@@ -293,16 +315,9 @@ normalization_minmax <- function(x, desc) {
 ```
 
 
-Create traditional Autoencoder model for outlier detection
-
-Select ML_GRF_stance_N as example
-
 ```{r}
-
-K <- keras::backend()
-
-set.seed(1234212)
-
+# K <- keras::backend()
+set.seed(123)
 dt.ml <-  sort(sample(nrow(ml_grf), nrow(ml_grf)*.7))
 df_train.ml<-ml_grf[dt.ml,]
 df_test.ml<-ml_grf[-dt.ml,]
@@ -363,7 +378,12 @@ model_ml %>% fit(
   validation_data = list(x_test.ml[y_test.ml == 0,], x_test.ml[y_test.ml == 0,]), 
   callbacks = list(checkpoint, early_stopping)
 )
+```
 
+
+# Results:
+From the plots we get, we can see 
+```{r}
 loss <- evaluate(model_ml, x = x_test.ml[y_test.ml == 0,], y = x_test.ml[y_test.ml == 0,])
 loss
 
@@ -408,6 +428,23 @@ Model Reconstruction check
 plot(x_train.ml[1,], type = "l", col = "red")
 lines(pred_train.ml[1,], type = "l", col = "green")
 ```
+
+
+
+
+
+
+
+Discussion
+
+
+
+Citataion
+$1.$ Wikimedia Foundation. (2021, October 27). Functional principal component analysis. Wikipedia. Retrieved May 4, 2022, from             https://en.wikipedia.org/wiki/Functional_principal_component_analysis 
+$2.$ Shang, H. L. (2013). A survey of functional principal component analysis. AStA Advances in Statistical Analysis, 98(2), 121–142. https://doi.org/10.1007/s10182-013-0213-1 
+$3.$Functional PCA in R. (2021, October 1). Retrieved May 4, 2022, from https://cran.r-project.org/web/packages/fdapace/vignettes/fdapaceVig.html 
+$4.$Badr, W. (2021, December 9). Auto-Encoder: What Is It? And What Is It Used For? (Part 1). Medium. https://towardsdatascience.com/auto-encoder-what-is-it-and-what-is-it-used-for-part-1-3e5c6f017726Jordan, 
+$5.$J. (2018, March 19). Introduction to autoencoders. Jeremy Jordan. https://www.jeremyjordan.me/autoencoders/
 
 
 Results:
