@@ -24,88 +24,35 @@ pacman::p_load(
   "keras",
   "caret"
 )
-```
 
-
-```{r}
-#load data:
-ID_info <- read_excel("/Users/xuchen/Desktop/MA679/PTProject_Data/IDinfo.xls")
-# Time-normalized data
-AP_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/AP_GRF_stance_N.csv", header = FALSE)
-ML_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/ML_GRF_stance_N.csv", header = FALSE)
-V_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/V_GRF_stance_N.csv", header = FALSE)
+source("data_proc.R")
 ```
 
 ##Abstract:
 
-    Our client is studying osteoarthritis of the knees by imaging subjects’ walking motion over a series of pressure plates. We reconstructed the force trend with the time series data collected from the pressure plates to have a general insight about the experiment. We then tried to find new important identifiers using different unsupervised dimension reduction models: Functional PCA and traditional Autoencoder. In order to make the model we built more practical, we trained our Autoencoder model to detect outliers and used Precision-Recall curve to determine the threshold. This report consists of four main sections: Introduction, Data and Methods, Model comparison, and Discussion. 
+Our client is studying osteoarthritis of the knees by imaging subjects’ walking motion over a series of pressure plates. We reconstructed the force trend with the time series data collected from the pressure plates to have a general insight about the experiment. We then tried to find new important identifiers using different unsupervised dimension reduction models: Functional PCA and traditional Autoencoder. In order to make the model we built more practical, we trained our Autoencoder model to detect outliers and used Precision-Recall curve to determine the threshold. This report consists of four main sections: Introduction, Data and Methods, Model comparison, and Discussion. 
 
 ##Introduction:
 
-    Mechanical loading has been implicated in knee osteoarthritis pathogenesis, suggesting that interventions aimed at changing joint loading may be key to reducing the burden of knee osteoarthritis. Our client from the movement & applied imaging lab of Boston University conducted an experiment to study osteoarthritis of the knees by imaging participants’ walking motion over three pieces of pressure plates. During the motion, the pressure plates measure three forces and three moment components. Our clients manually extracted some potential features. What we need to do is try different machine learning methods to reconstruct the motion and see if we can use some new features to describe the motions and study osteoarthritis from a new perspective.
+Mechanical loading has been implicated in knee osteoarthritis pathogenesis, suggesting that interventions aimed at changing joint loading may be key to reducing the burden of knee osteoarthritis. Our client from the movement & applied imaging lab of Boston University conducted an experiment to study osteoarthritis of the knees by imaging participants’ walking motion over three pieces of pressure plates. During the motion, the pressure plates measure three forces and three moment components. Our clients manually extracted some potential features. What we need to do is try different machine learning methods to reconstruct the motion and see if we can use some new features to describe the motions and study osteoarthritis from a new perspective.
     
 
 ##Exploratory data analysis:
 
 ###The first step: datasets select
 
-    We select three feature to do analysis: AP_GRFs, ML_GRFs, V_GRFs.AP_GRFs is the anterior-posterior ground reaction force, ML_GRFs is the medial-lateral ground reaction force and V_GRFs is vertical ground reaction force. The reason we select these tree feature is that we want to focus on the GRF in order to have better understanding of experiment and the motion of foot. 
-
-```{r}
-mat_ap <- as.matrix(AP_GRF_stance_N)
-mat_ml <- as.matrix(ML_GRF_stance_N)
-mat_v <- as.matrix(V_GRF_stance_N)
-
-color = rgb(runif(15696,0,1),runif(15696,0,1), runif(15696,0,1))
-
-ml_ts <- function(df){
-  plot(df[1,], col = color[1], type = 'l', lwd = 1, ylim = c(-150,200), xlab = "Time point", ylab = "ML_GRF_stance_N")
-  for (i in 2:nrow(df)) {
-    lines(df[i,], col = color[i], type = 'l', lwd = 1)
-  }
-}
-
-ap_ts <- function(df){
-  plot(df[1,], col = color[1], type = 'l', lwd = 1, ylim = c(-400,400), xlab = "Time point", ylab = "AP_GRF_stance_N")
-  for (i in 2:nrow(df)) {
-    lines(df[i,], col = color[i], type = 'l', lwd = 1)
-  }
-}
-
-v_ts <- function(df){
-  plot(df[1,], col = color[1], type = 'l', lwd = 1, ylim = c(0,2000), xlab = "Time point", ylab = "V_GRF_stance_N")
-  for (i in 2:nrow(df)) {
-    lines(df[i,], col = color[i], type = 'l', lwd = 1)
-  }
-}
-
-```
+We select three feature to do analysis: AP_GRFs, ML_GRFs, V_GRFs.AP_GRFs is the anterior-posterior ground reaction force, ML_GRFs is the medial-lateral ground reaction force and V_GRFs is vertical ground reaction force. The reason we select these tree feature is that we want to focus on the GRF in order to have better understanding of experiment and the motion of foot. 
 
 
 ###Reconstruct the time normalized force plot:
 
-    We first we took look at the trial length distribution for different knees to see if there exists some significant differences between each knee. The two vertical line are median trial length for different knee. As we can see, among the whole participant, the trial length of right foot is a little bit longer than left foot, but there is no significant difference between these two knee. Then we built the time series plot for the ground reaction force of three dimensions to see the trends of these whethere there is some obvious identifiers. 
+We first we took look at the trial length distribution for different knees to see if there exists some significant differences between each knee. The two vertical line are median trial length for different knee. As we can see, among the whole participant, the trial length of right foot is a little bit longer than left foot, but there is no significant difference between these two knee. Then we built the time series plot for the ground reaction force of three dimensions to see the trends of these whether there is some obvious identifiers. 
 
 ```{r}
-median_trlength <- ID_info %>% group_by(KNEE) %>% summarise(median = median(tr_length))
-mean_trlength <- ID_info %>% group_by(KNEE) %>% summarise(mean = mean(tr_length))
-
-# First, we took look at the trial length distribution for different knees 
-# to see if there exits some significant difference between each knee.
-# The two vertical lines are median trial length for different knee:
-
-trial_length <- ggplot(ID_info, aes(x = tr_length, fill = KNEE))+
-  geom_density(alpha = 0.5,adjust = 0.3)+
-  geom_vline(data = median_trlength, aes(xintercept = median, color = KNEE), size=1)+
-  labs(x= "Trial length",
-       subtitle="Trial length distribution for different knee")+
-  theme(legend.position="bottom")
-
 trial_length
-
 ```
 
-    After we rebuilt the anterior-posterior ground reaction force data, we can find there is an anterior force peak and posterior force peak. After we rebuilt the medial-lateral ground reaction force data, we can find there are three force peaks.After we rebuilt the vertical ground reaction force data, we can find there are two force peaks
+After we rebuilt the anterior-posterior ground reaction force data, we can find there is an anterior force peak and posterior force peak. After we rebuilt the medial-lateral ground reaction force data, we can find there are three force peaks.After we rebuilt the vertical ground reaction force data, we can find there are two force peaks
 
 ```{r}
 ap_plot <- ap_ts(mat_ap)
@@ -116,11 +63,12 @@ ap_plot <- ap_ts(mat_ap)
 ml_plot <- ml_ts(mat_ml)
 ```
 
+
 ```{r}
 v_plot <- v_ts(mat_v)
 ```
 
-    We detect outliers for all 3 time normalized GRFs and label them 1 as outliers and 0 as normal.
+We detect outliers for all 3 time normalized GRFs and label them 1 as outliers and 0 as normal.
 
 | GRF name                                                 | Number of Normal Curves | Number of abnormal Curves(Outliers) |Abnormal Percentage| 
 | :--:                                                     |:---:                    |:--:                                 |:--:               |
@@ -128,7 +76,7 @@ v_plot <- v_ts(mat_v)
 | Time Normalized Medial-lateral Ground Reaction Force     | 13545                   | 2151                                | 13.7$%$           |   
 | Time Normalized Vertical Ground Reaction Force           | 13981                   | 1715                                | 10.9$%$           |
 
-    After we use Magnitude-Shape plot based on the directional outlyingness for functional data. We add the labels to three different grand reaction forces and let normal curves equal to 0 and outliers equal to 1.
+After we use Magnitude-Shape plot based on the directional outlyingness for functional data. We add the labels to three different grand reaction forces and let normal curves equal to 0 and outliers equal to 1.
 ```{r}
 
 ap_ms <- msplot(dts = AP_GRF_stance_N, plot = T)
@@ -174,8 +122,6 @@ for (i in 1:nrow(ml_grf)) {
 }
 
 ml_grf <- ml_grf[c(102, 1:100)]
-
-
 ```
 
 
@@ -205,7 +151,7 @@ v_grf <- v_grf[c(102, 1:100)]
 ##Baseline model: Functional PCA
 ###Introduction to functional PCA:
 
-    Functional principal component analysis (FPCA) is a statistical method for investigating the dominant modes of variation of functional data. Using this method, a random function is represented in the eigenbasis, which is an orthonormal basis of the Hilbert space $L^2$ that consists of the eigenfunctions of the autocovariance operator. FPCA represents functional data in the most parsimonious way, in the sense that when using a fixed number of basis functions, the eigenfunction basis explains more variation than any other basis expansion. FPCA can be applied for representing random functions, or in functional regression and classification. FPCA finds the set of orthogonal principal component functions that maximize the variance along each component.
+Functional principal component analysis (FPCA) is a statistical method for investigating the dominant modes of variation of functional data. Using this method, a random function is represented in the eigenbasis, which is an orthonormal basis of the Hilbert space $L^2$ that consists of the eigenfunctions of the autocovariance operator. FPCA represents functional data in the most parsimonious way, in the sense that when using a fixed number of basis functions, the eigenfunction basis explains more variation than any other basis expansion. FPCA can be applied for representing random functions, or in functional regression and classification. FPCA finds the set of orthogonal principal component functions that maximize the variance along each component.
 
 
 How to use functional PCA:
@@ -219,63 +165,60 @@ $$
 \hat{\xi}_{i k}=\hat{E}\left[\hat{\xi}_{i k} \mid Y_{i}\right]=\hat{\lambda}_{k} \hat{\phi}_{i k}^{T} \Sigma_{Y_{i}}^{-1}\left(Y_{i}-\hat{\mu}_{i}\right)
 $$
 
-    From FPCA, we can make the dimension reduction to our data, from 100 data points to 12 functional principal components for anterior-posterior ground reaction forces.Based on the scree-plot we see that the first three components appear to encapsulate most of the relevant variation. The number of eigen components to reach a 99% fraction of variance explained is 12 but just 7 principal components are enough to reach a 95.0%.
+From FPCA, we can make the dimension reduction to our data, from 100 data points to 12 functional principal components for anterior-posterior ground reaction forces.Based on the scree-plot we see that the first three components appear to encapsulate most of the relevant variation. The number of eigen components to reach a 99% fraction of variance explained is 12 but just 7 principal components are enough to reach a 95.0%.
   
 
 ```{r}
-L_AP <- MakeFPCAInputs(ap_fpca$new, ap_fpca$t, ap_fpca$force)
-FPCAdense_AP <- FPCA(L_AP$Ly, L_AP$Lt)
-
 # Plot the FPCA object
 plot(FPCAdense_AP)
+```
 
+
+```{r}
 par(mfrow=c(1,1))
 CreateOutliersPlot(FPCAdense_AP, optns = list(K = 12, variant = 'KDE'))
 ```
 
-    Similar to anterior-posterior ground reaction forces,  we can make the dimension reduction to our data, from 100 data points to 15 functional principal components for medial-lateral ground reaction force .Based on the scree-plot we see that the first three components appear to encapsulate most of the relevant variation. The number of principal components to reach a 99% fraction of variance explained is 15 but just 7 principal components are enough to reach a 95.0%.
+Similar to anterior-posterior ground reaction forces,  we can make the dimension reduction to our data, from 100 data points to 15 functional principal components for medial-lateral ground reaction force .Based on the scree-plot we see that the first three components appear to encapsulate most of the relevant variation. The number of principal components to reach a 99% fraction of variance explained is 15 but just 7 principal components are enough to reach a 95.0%.
 
 ```{r}
-L_ML <- MakeFPCAInputs(ml_fpca$new, ml_fpca$t, ml_fpca$force)
-FPCAdense_ML <- FPCA(L_ML$Ly, L_ML$Lt)
-
 # Plot the FPCA object
 plot(FPCAdense_ML)
+```
 
+
+```{r}
 par(mfrow=c(1,1))
   CreateOutliersPlot(FPCAdense_ML, optns = list(K = 15, variant = 'KDE'))
 ```
 
-    Similar to medial-lateral ground reaction forces,  we can make the dimension reduction to our data, from 100 data points to 8 functional principal components for vertical ground reaction force .Based on the scree-plot we see that the first three components appear to encapsulate most of the relevant variation. The number of principal components to reach a 99% fraction of variance explained is 8 but just 4 principal components are enough to reach a 95.0%.
+Similar to medial-lateral ground reaction forces,  we can make the dimension reduction to our data, from 100 data points to 8 functional principal components for vertical ground reaction force .Based on the scree-plot we see that the first three components appear to encapsulate most of the relevant variation. The number of principal components to reach a 99% fraction of variance explained is 8 but just 4 principal components are enough to reach a 95.0%.
     
 ```{r}
-L_V <- MakeFPCAInputs(v_fpca$new, v_fpca$t, v_fpca$force)
-FPCAdense_V <- FPCA(L_V$Ly, L_V$Lt)
-
 # Plot the FPCA object
 plot(FPCAdense_V)
+```
 
+```{r}
 par(mfrow=c(1,1))
   CreateOutliersPlot(FPCAdense_V, optns = list(K = 8, variant = 'KDE'))
 ```
 
 
-## Reconstruction with functional PCA principle components. 
+## Reconstruction with functional PCA principle components for medial-lateral ground reaction forces. 
 ```{r}
-
+# Select the first PCs:
+par(mfrow=c(1,2))
+  CreateOutliersPlot(FPCAdense_ML, optns = list(K = 15, variant = 'KDE'))
+  ggplot(data.frame(PC1 = ML_stance_dr[,1], PC2 = ML_stance_dr[,2]), aes(x = PC1, y = PC2,col = as.factor(ml_grf$status)))+ geom_point()+ggtitle("FPCA PCs reconstruct data plot")
 ```
 
 
-
-
-
-## Reconstruction with functional PCA principle components. 
-```{r}
-
-```
 
 ##Tradictional auto-encoder
+
 Autoencoders are an unsupervised learning technique in which we leverage neural networks for the task of representation learning. Specifically, we'll design a neural network architecture such that we impose a bottleneck in the network which forces a compressed knowledge representation of the original input. If the input features were each independent of one another, this compression and subsequent reconstruction would be a very difficult task. However, if some sort of structure exists in the data (ie. correlations between input features), this structure can be learned and consequently leveraged when forcing the input through the network's bottleneck.
+
 Autoencoders consists of 4 main parts:
 
 1- Encoder: In which the model learns how to reduce the input dimensions and compress the input data into an encoded representation.
@@ -287,13 +230,46 @@ Autoencoders consists of 4 main parts:
 4- Reconstruction Loss: This is the method that measures measure how well the decoder is performing and how close the output is to the original input.
 
 
-Because our project is focusing on unsupervised learning, we are lack of outcomes and labels. As a result, we suppose the outlierr may represent participant with some abnormal with knees when they participated in the experiment.
+Because there are three peaks in the previous EDA plot we got, so we think medial-lateral ground reaction force can get the identifier is more representative. In addition, medial-lateral ground reaction force is a horizontal force which can represent the stability of two knees. In other words this force can be identifies the participant with Osteoarthritis.
 
-Because there are three peaks in the previous EDA plot we got, so we think medial-lateral ground reaction force can get the identifier is more representative. In addition, medial-lateral ground reaction force is a horizontal force which can represent the stability of two knees. In other words this force can be identifies the participant with  Osteoarthritis.
+##Autoencoder tryout:
+
+First we try traditional autoencoder:
+
+```{r}
+# summar of model
+summary(model_try1) 
+
+plot(history)
+
+# evaluate the performance of the model
+mse.ae
+
+plot(df_test.ml[1,], type = "l", col = "red")
+lines(yhat_model_try1[1,], type = "l", col = "green")
+```
+
+
+Then, we try LSTM Autoencoder:
+
+```{r}
+summary(lstm_model)
+
+plot(history2)
+
+mse.lstm 
+
+plot(x_test_ml_lstm[1,,], type = "l", col = "red")
+lines(yhat_model_lstm[1,,], type = "l", col = "green")
+```
+
+After compare the reconstruction error for the two model we built, we selected the traditional autoencoder to build our outlier detector model. Because first, the data processing time and model running time is relativly short with a smaller loss. 
+
+Because our project is focusing on unsupervised learning, we are lack of outcomes and labels. As a result, we suppose the outlier may represent participant with some abnormal with knees when they participated in the experiment.
 
 First, We created 2 functions to help us. The first one gets descriptive statistics about the dataset that are used for scaling. Then we have a function to perform the min-max scaling. As we know there are 100 data points for one curve, so for the first layer of autoencoder we select half of the original number of features which is 50. And for the bottle neck layer we choose 60% of the number of the first layers units. 
 
-We split the training data and test data with odds 7:3. To compare the reconstruction of our model performance, we use mean squared error as our loss function. According to the previous table, the persentage of outliers for medial-lateral ground reaction Force is 13.7$%$ which means the ourdatset is imbalanced. So we use precision-recall curve to find the optimal threshold to classify the outliers.
+We split the training data and test data with odds 7:3. To compare the reconstruction of our model performance, we use mean squared error as our loss function. According to the previous table, the percentage of outliers for medial-lateral ground reaction Force is 13.7$%$ which means the our datset is imbalanced. So we use precision-recall curve to find the optimal threshold to classify the outliers.
 
 ```{r}
 
@@ -316,106 +292,23 @@ normalization_minmax <- function(x, desc) {
 
 
 ```{r}
-# K <- keras::backend()
-set.seed(123)
-dt.ml <-  sort(sample(nrow(ml_grf), nrow(ml_grf)*.7))
-df_train.ml<-ml_grf[dt.ml,]
-df_test.ml<-ml_grf[-dt.ml,]
-
-
-desc <- df_train.ml %>% 
-  select(-status) %>% 
-  get_desc()
-
-x_train.ml <- df_train.ml %>%
-  select(-status) %>%
-  normalization_minmax(desc) %>%
-  as.matrix()
-
-x_test.ml <- df_test.ml %>%
-  select(-status) %>%
-  normalization_minmax(desc) %>%
-  as.matrix()
-
-y_train.ml <- df_train.ml$status
-y_test.ml <- df_test.ml$status
-
-model_ml <- keras_model_sequential()
-model_ml %>%
-  layer_dense(units = 50, activation = "relu", input_shape = ncol(x_train.ml)) %>%
-  layer_dense(units = 30, activation = "relu", name = "bottleneck") %>%
-  layer_dense(units = 50, activation = "relu") %>%
-  layer_dense(units = ncol(x_train.ml))
-
-
-
 # summar of model
 summary(model_ml) 
-
-
-
-# compile model
-model_ml %>% compile(
-  loss = "mean_squared_error", 
-  optimizer = "adam"
-)
-
-
-checkpoint <- callback_model_checkpoint(
-  filepath = "model.hdf5", 
-  save_best_only = TRUE, 
-  period = 1,
-  verbose = 1
-)
-
-early_stopping <- callback_early_stopping(patience = 5)
-
-model_ml %>% fit(
-  x = x_train.ml[y_train.ml == 0,], 
-  y = x_train.ml[y_train.ml == 0,], 
-  epochs = 100, 
-  batch_size = 32,
-  validation_data = list(x_test.ml[y_test.ml == 0,], x_test.ml[y_test.ml == 0,]), 
-  callbacks = list(checkpoint, early_stopping)
-)
+loss
 ```
 
 
 # Results:
 From the plots we get, we can see 
 ```{r}
-loss <- evaluate(model_ml, x = x_test.ml[y_test.ml == 0,], y = x_test.ml[y_test.ml == 0,])
-loss
-
-
-pred_train.ml <- predict(model_ml, x_train.ml)
-mse_train.ml <- apply((x_train.ml - pred_train.ml)^2, 1, sum)
-
-pred_test.ml <- predict(model_ml, x_test.ml)
-mse_test.ml <- apply((x_test.ml - pred_test.ml)^2, 1, sum)
-
-possible_k <- seq(0, 0.5, length.out = 100)
-precision <- sapply(possible_k, function(k) {
-  predicted_class <- as.numeric(mse_test.ml > k)
-  sum(predicted_class == 1 & y_test.ml == 1)/sum(predicted_class)
-})
-
 qplot(possible_k, precision, geom = "line") +
   labs(x = "Threshold", y = "Precision")
-
-
-recall <- sapply(possible_k, function(k) {
-  predicted_class <- as.numeric(mse_test.ml > k)
-  sum(predicted_class == 1 & y_test.ml == 1)/sum(y_test.ml)
-})
 
 qplot(possible_k, recall, geom = "line") +
   labs(x = "Threshold", y = "Recall")
 
 qplot(recall, precision, geom = "line")+
   labs(x = "Recall", y = "Precision")
-
-fmeasure <- (2 * precision * recall) / (precision + recall)
 
 which.max(fmeasure)
 
@@ -431,10 +324,6 @@ lines(pred_train.ml[1,], type = "l", col = "green")
 
 
 
-
-
-
-
 Discussion
 
 
@@ -445,18 +334,3 @@ $2.$ Shang, H. L. (2013). A survey of functional principal component analysis. A
 $3.$Functional PCA in R. (2021, October 1). Retrieved May 4, 2022, from https://cran.r-project.org/web/packages/fdapace/vignettes/fdapaceVig.html 
 $4.$Badr, W. (2021, December 9). Auto-Encoder: What Is It? And What Is It Used For? (Part 1). Medium. https://towardsdatascience.com/auto-encoder-what-is-it-and-what-is-it-used-for-part-1-3e5c6f017726Jordan, 
 $5.$J. (2018, March 19). Introduction to autoencoders. Jeremy Jordan. https://www.jeremyjordan.me/autoencoders/
-
-
-Results:
-
-
-
-
-Discussion
-
-
-
-Citataion
-$1.$ Wikimedia Foundation. (2021, October 27). Functional principal component analysis. Wikipedia. Retrieved May 4, 2022, from             https://en.wikipedia.org/wiki/Functional_principal_component_analysis 
-$2.$ Shang, H. L. (2013). A survey of functional principal component analysis. AStA Advances in Statistical Analysis, 98(2), 121–142. https://doi.org/10.1007/s10182-013-0213-1 
-$3.$Functional PCA in R. (2021, October 1). Retrieved May 4, 2022, from https://cran.r-project.org/web/packages/fdapace/vignettes/fdapaceVig.html 

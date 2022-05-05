@@ -21,36 +21,35 @@ K <- keras::backend()
 
 start with a feed-forward network with one hidden layer
 ```{r}
+#Traditional Autoencoder
+set.seed(123)
 
-AP.pca <- prcomp(train.AP)
-summary(AP.pca)
+dt.ml <-  sort(sample(nrow(ml_grf), nrow(ml_grf)*.7))
+df_train.ml<-ml_grf[dt.ml,] %>% select(-status) %>% as.matrix()
+df_test.ml<-ml_grf[-dt.ml,] %>% select(-status) %>% as.matrix()
 
-xtrain <- as.matrix(train.AP)
-xtest <- as.matrix(test.AP)
-
-model <- keras_model_sequential()
-model %>%
-  layer_dense(units = 76, activation = "relu", input_shape = ncol(xtrain)) %>%
-  layer_dense(units = 55, activation = "relu", name = "bottleneck") %>%
-  layer_dense(units = 76, activation = "relu") %>%
-  layer_dense(units = ncol(xtrain))
+model_try1 <- keras_model_sequential()
+model_try1 %>%
+  layer_dense(units = 50, activation = "relu", input_shape = ncol(df_train.ml)) %>%
+  layer_dense(units = 30, activation = "relu", name = "bottleneck") %>%
+  layer_dense(units = 50, activation = "relu") %>%
+  layer_dense(units = ncol(df_train.ml))
 
 # summar of model
-summary(model) 
+summary(model_try1) 
 
 
 # compile model
-model %>% compile(
+model_try1 %>% compile(
   loss = "mean_squared_error", 
-  optimizer = "adam",
-  metrics = c('accuracy')
+  optimizer = "adam"
 )
 
 # fit model
 
-history <- model %>% fit(
-  x = xtrain, 
-  y = xtrain, 
+history <- model_try1 %>% fit(
+  x = df_train.ml, 
+  y = df_train.ml, 
   epochs = 100,
   verbose = 0
 )
@@ -60,16 +59,64 @@ plot(history)
 
 
 # evaluate the performance of the model
-mse.ae2 <- evaluate(model, xtest, xtest)
-mse.ae2
+mse.ae <- evaluate(model_try1, df_test.ml, df_test.ml)
+mse.ae
 
-yhat_normal_ae <- predict(model, xtrain, verbose=0)
+yhat_model_try1 <- predict(model_try1, df_test.ml, verbose=0)
 
-intermediate_layer_model <- keras_model(inputs = model$input, outputs = get_layer(model, "bottleneck")$output)
-
-intermediate_output <- predict(intermediate_layer_model, xtrain)
+plot(df_test.ml[1,], type = "l", col = "red")
+lines(yhat_model_try1[1,], type = "l", col = "green")
 
 ```
+
+
+```{r}
+library(kerasR)
+library(abind)
+
+x_train_ml_lstm = array_reshape(df_train.ml, c(dim(df_train.ml)[1],1, dim(df_train.ml)[2]))
+x_test_ml_lstm = array_reshape(df_test.ml, c(dim(df_test.ml)[1],1, dim(df_test.ml)[2]))
+
+lstm_model <- keras_model_sequential() 
+lstm_model %>% 
+  layer_lstm(units = 128, activation = "relu",return_sequences = TRUE, input_shape = c(1, 100))%>%
+  layer_lstm(units = 32, activation = "relu", return_sequences = FALSE)%>%
+  layer_repeat_vector(1)%>%
+  layer_lstm(units = 32,activation = "relu", return_sequences = TRUE)%>%
+  layer_lstm(units = 128, activation = "relu", return_sequences = TRUE)%>%
+  time_distributed(layer_dense(units = 100))
+
+summary(lstm_model)
+lstm_model %>% compile(
+    loss = "mean_squared_error", 
+    optimizer = "adam"
+)
+
+history2 <- lstm_model %>% fit(
+  x_train_ml_lstm, x_train_ml_lstm, 
+  epochs = 100,
+  verbose = 1
+)
+
+
+plot(history2)
+
+mse.lstm <- lstm_model %>% evaluate(x_test_ml_lstm, x_test_ml_lstm)
+  
+
+a <- as.matrix(expand_dims(x_train_ml_lstm[1,,],  axis = 0))
+
+bottlenect_model <- keras_model(inputs = lstm_model$input, outputs = get_layer(lstm_model, "lstm_99")$output)
+
+yhat_dr <- predict(bottlenect_model, x_train_lstm, verbose=0)
+
+yhat_model_lstm <- predict(lstm_model, x_test_ml_lstm, verbose=0)
+
+plot(x_test_ml_lstm[1,,], type = "l", col = "red")
+lines(yhat_model_lstm[1,,], type = "l", col = "green")
+```
+
+
 
 
 ```{r}
@@ -254,3 +301,115 @@ ggplot(data.frame(PC1 = AP_stance_dr[,1], PC2 = AP_stance_dr[,2]), aes(x = PC1, 
 
 View(yhat_dr)
 ```
+
+
+
+outlier detector model:
+
+```{r}
+K <- keras::backend()
+
+set.seed(1234)
+
+dt <-  sort(sample(nrow(ml_grf), nrow(ml_grf)*.7))
+train.ml<-ml_grf[dt,] 
+test.ml<-ml_grf[-dt,] 
+
+desc <- train.ml %>% 
+  select(-status) %>% 
+  get_desc()
+
+x_train.ml <- train.ml %>%
+  select(-status) %>%
+  normalization_minmax(desc) %>%
+  as.matrix()
+
+x_test.ml <- test.ml %>%
+  select(-status) %>%
+  normalization_minmax(desc) %>%
+  as.matrix()
+
+y_train.ml <- train.ml$status
+y_test.ml <- test.ml$status
+
+model_ml <- keras_model_sequential()
+model_ml %>%
+  layer_dense(units = 50, activation = "relu", input_shape = ncol(x_train.ml)) %>%
+  layer_dense(units = 30, activation = "relu", name = "bottleneck") %>%
+  layer_dense(units = 50, activation = "relu") %>%
+  layer_dense(units = ncol(x_train.ml))
+
+
+
+# summar of model
+summary(model_ml) 
+
+
+
+# compile model
+model_ml %>% compile(
+  loss = "mean_squared_error", 
+  optimizer = "adam"
+)
+
+
+checkpoint <- callback_model_checkpoint(
+  filepath = "model.hdf5", 
+  save_best_only = TRUE, 
+  period = 1,
+  verbose = 1
+)
+
+early_stopping <- callback_early_stopping(patience = 5)
+
+model_ml %>% fit(
+  x = x_train.ml[y_train.ml == 0,], 
+  y = x_train.ml[y_train.ml == 0,], 
+  epochs = 100, 
+  batch_size = 32,
+  validation_data = list(x_test.ml[y_test.ml == 0,], x_test.ml[y_test.ml == 0,]), 
+  callbacks = list(checkpoint, early_stopping)
+)
+
+loss <- evaluate(model_ml, x = x_test.ml[y_test.ml == 0,], y = x_test.ml[y_test.ml == 0,])
+loss
+
+
+pred_train.ml <- predict(model_ml, x_train.ml)
+mse_train.ml <- apply((x_train.ml - pred_train.ml)^2, 1, sum)
+
+pred_test.ml <- predict(model_ml, x_test.ml)
+mse_test.ml <- apply((x_test.ml - pred_test.ml)^2, 1, sum)
+
+possible_k <- seq(0, 0.5, length.out = 100)
+precision <- sapply(possible_k, function(k) {
+  predicted_class <- as.numeric(mse_test.ml > k)
+  sum(predicted_class == 1 & y_test.ml == 1)/sum(predicted_class)
+})
+
+qplot(possible_k, precision, geom = "line") +
+  labs(x = "Threshold", y = "Precision")
+
+
+recall <- sapply(possible_k, function(k) {
+  predicted_class <- as.numeric(mse_test.ml > k)
+  sum(predicted_class == 1 & y_test.ml == 1)/sum(y_test.ml)
+})
+
+qplot(possible_k, recall, geom = "line") +
+  labs(x = "Threshold", y = "Recall")
+
+qplot(recall, precision, geom = "line")+
+  labs(x = "Recall", y = "Precision")
+
+fmeasure <- (2 * precision * recall) / (precision + recall)
+
+which.max(fmeasure)
+
+possible_k[which.max(fmeasure)]
+```
+
+
+
+
+
