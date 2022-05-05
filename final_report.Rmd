@@ -49,7 +49,7 @@ V_GRF_stance_N <- read.csv("/Users/xuchen/Desktop/MA679/PTProject_Data/V_GRF_sta
 
 ###The first step: datasets select
 
-select AP_GRFs, ML_GRFs, V_GRFs
+    We select three feature to do analysis: AP_GRFs, ML_GRFs, V_GRFs.AP_GRFs is the anterior-posterior ground reaction force, ML_GRFs is the medial-lateral ground reaction force and V_GRFs is vertical ground reaction force. The reason we select these tree feature is that we want to focus on the GRF in order to have better understanding of experiment and the motion of foot. 
 
 ```{r}
 mat_ap <- as.matrix(AP_GRF_stance_N)
@@ -61,21 +61,21 @@ color = rgb(runif(15696,0,1),runif(15696,0,1), runif(15696,0,1))
 ml_ts <- function(df){
   plot(df[1,], col = color[1], type = 'l', lwd = 1, ylim = c(-150,200), xlab = "Time point", ylab = "ML_GRF_stance_N")
   for (i in 2:nrow(df)) {
-    lines(df[i,], col = color1[i], type = 'l', lwd = 1)
+    lines(df[i,], col = color[i], type = 'l', lwd = 1)
   }
 }
 
 ap_ts <- function(df){
   plot(df[1,], col = color[1], type = 'l', lwd = 1, ylim = c(-400,400), xlab = "Time point", ylab = "AP_GRF_stance_N")
   for (i in 2:nrow(df)) {
-    lines(df[i,], col = color1[i], type = 'l', lwd = 1)
+    lines(df[i,], col = color[i], type = 'l', lwd = 1)
   }
 }
 
 v_ts <- function(df){
   plot(df[1,], col = color[1], type = 'l', lwd = 1, ylim = c(0,2000), xlab = "Time point", ylab = "V_GRF_stance_N")
   for (i in 2:nrow(df)) {
-    lines(df[i,], col = color1[i], type = 'l', lwd = 1)
+    lines(df[i,], col = color[i], type = 'l', lwd = 1)
   }
 }
 
@@ -84,9 +84,33 @@ v_ts <- function(df){
 
 ###Reconstruct the time normalized force plot:
 
+    We first we took look at the trial length distribution for different knees to see if there exists some significant differences between each knee. The two vertical line are median trial length for different knee. As we can see, among the whole participant, the trial length of right foot is a little bit longer than left foot, but there is no significant difference between these two knee. Then we built the time series plot for the ground reaction force of three dimensions to see the trends of these whethere there is some obvious identifiers. 
+
+```{r}
+median_trlength <- ID_info %>% group_by(KNEE) %>% summarise(median = median(tr_length))
+mean_trlength <- ID_info %>% group_by(KNEE) %>% summarise(mean = mean(tr_length))
+
+# First, we took look at the trial length distribution for different knees 
+# to see if there exits some significant difference between each knee.
+# The two vertical lines are median trial length for different knee:
+
+trial_length <- ggplot(ID_info, aes(x = tr_length, fill = KNEE))+
+  geom_density(alpha = 0.5,adjust = 0.3)+
+  geom_vline(data = median_trlength, aes(xintercept = median, color = KNEE), size=1)+
+  labs(x= "Trial length",
+       subtitle="Trial length distribution for different knee")+
+  theme(legend.position="bottom")
+
+trial_length
+
+```
+
+    After we rebuilt the anterior-posterior ground reaction force data, we can find there is an anterior force peak and posterior force peak. After we rebuilt the medial-lateral ground reaction force data, we can find there are three force peaks.After we rebuilt the vertical ground reaction force data, we can find there are two force peaks
+
 ```{r}
 ap_plot <- ap_ts(mat_ap)
 ```
+
 
 ```{r}
 ml_plot <- ml_ts(mat_ml)
@@ -96,12 +120,18 @@ ml_plot <- ml_ts(mat_ml)
 v_plot <- v_ts(mat_v)
 ```
 
+    We detect outliers for all 3 time normalized GRFs and label them 1 as outliers and 0 as normal.
 
-Detect outliers for all 3 time normalized GRFs and label them 1 as outliers and 0 as normal.
+| GRF name                                                 | Number of Normal Curves | Number of abnormal Curves(Outliers) |Abnormal Percentage| 
+| :--:                                                     |:---:                    |:--:                                 |:--:               |
+| Time Normalized Anterior-posterior Ground Reaction Force | 13579                   | 2117                                | 13.5$%$           |
+| Time Normalized Medial-lateral Ground Reaction Force     | 13545                   | 2151                                | 13.7$%$           |   
+| Time Normalized Vertical Ground Reaction Force           | 13981                   | 1715                                | 10.9$%$           |
 
+    After we use Magnitude-Shape plot based on the directional outlyingness for functional data. We add the labels to three different grand reaction forces and let normal curves equal to 0 and outliers equal to 1.
 ```{r}
 
-ap_ms <- msplot(dts = AP_GRF_stance_N, plot = F)
+ap_ms <- msplot(dts = AP_GRF_stance_N, plot = T)
 
 ap_outlier_id <- ap_ms$outliers
 
@@ -120,15 +150,21 @@ for (i in 1:nrow(ap_grf)) {
 }
 
 ap_grf <- ap_grf[c(102, 1:100)]
+```
 
 
-ml_ms <- msplot(dts = ML_GRF_stance_N, plot = F)
+
+```{r}
+ml_ms <- msplot(dts = ML_GRF_stance_N, plot = T)
 
 ml_outlier_id <- ml_ms$outliers
 
 ml_grf <- ML_GRF_stance_N %>%
   mutate(index = row_number())
+```
 
+
+```{r}
 # label the outliers
 
 for (i in 1:nrow(ml_grf)) {
@@ -144,7 +180,7 @@ ml_grf <- ml_grf[c(102, 1:100)]
 
 
 
-v_ms <- msplot(dts = V_GRF_stance_N, plot = F)
+v_ms <- msplot(dts = V_GRF_stance_N, plot = T)
 
 v_outlier_id <- v_ms$outliers
 
@@ -167,28 +203,24 @@ v_grf <- v_grf[c(102, 1:100)]
 ```
 
 ##Baseline model: Functional PCA
+###Introduction to functional PCA:
 
-###data processing
+    Functional principal component analysis (FPCA) is a statistical method for investigating the dominant modes of variation of functional data. Using this method, a random function is represented in the eigenbasis, which is an orthonormal basis of the Hilbert space $L^2$ that consists of the eigenfunctions of the autocovariance operator. FPCA represents functional data in the most parsimonious way, in the sense that when using a fixed number of basis functions, the eigenfunction basis explains more variation than any other basis expansion. FPCA can be applied for representing random functions, or in functional regression and classification. FPCA finds the set of orthogonal principal component functions that maximize the variance along each component.
 
-```{r}
-data_pre_func <- function(df1, df2){
-  df <- cbind(df1, df2)
-  df3 <- df %>% pivot_longer(-c(ID, KNEE, TRIAL, tr_length), names_to = "time", values_to = "force")%>%
-    mutate(new = paste(ID, "-",KNEE, "-",TRIAL)) 
+
+How to use functional PCA:
+1. Calculate the smoothed mean $\hat{\mu}$ (using local linear smoothing) aggregating all the available readings together.
+2. Calculate for each curve separately its own raw covariance and then aggregate all these raw covariances to generate the sample raw covariance.
+3. Use the off-diagonal elements of the sample raw covariance to estimate the smooth covariance.
+4. Perform eigenanalysis on the smoothed covariance to obtain the estimated eigenfunctions $\hat{\phi}$ and eigenvalues $\hat{\lambda}$, then project that smoothed covariance on a positive semi-definite surface (Hall, Müller, and Yao 2008).
+5. Use Conditional Expectation (PACE step) to estimate the corresponding scores $\hat{\xi}$. ie.
+
+$$
+\hat{\xi}_{i k}=\hat{E}\left[\hat{\xi}_{i k} \mid Y_{i}\right]=\hat{\lambda}_{k} \hat{\phi}_{i k}^{T} \Sigma_{Y_{i}}^{-1}\left(Y_{i}-\hat{\mu}_{i}\right)
+$$
+
+    From FPCA, we can make the dimension reduction to our data, from 100 data points to 12 functional principal components for anterior-posterior ground reaction forces.Based on the scree-plot we see that the first three components appear to encapsulate most of the relevant variation. The number of eigen components to reach a 99% fraction of variance explained is 12 but just 7 principal components are enough to reach a 95.0%.
   
-  t <- rep(seq(0,100,length.out = 100),nrow(df))
-  
-  df_pre <- cbind(df3, t)
-  return(df_pre)
-}
-
-ap_fpca <- data_pre_func(ID_info, AP_GRF_stance_N)
-ml_fpca <- data_pre_func(ID_info, ML_GRF_stance_N)
-v_fpca <- data_pre_func(ID_info, V_GRF_stance_N)
-```
-
-
-Do FPCA for all 5 time normalized dfs:
 
 ```{r}
 L_AP <- MakeFPCAInputs(ap_fpca$new, ap_fpca$t, ap_fpca$force)
@@ -201,6 +233,7 @@ par(mfrow=c(1,1))
 CreateOutliersPlot(FPCAdense_AP, optns = list(K = 12, variant = 'KDE'))
 ```
 
+    Similar to anterior-posterior ground reaction forces,  we can make the dimension reduction to our data, from 100 data points to 15 functional principal components for medial-lateral ground reaction force .Based on the scree-plot we see that the first three components appear to encapsulate most of the relevant variation. The number of principal components to reach a 99% fraction of variance explained is 15 but just 7 principal components are enough to reach a 95.0%.
 
 ```{r}
 L_ML <- MakeFPCAInputs(ml_fpca$new, ml_fpca$t, ml_fpca$force)
@@ -213,7 +246,8 @@ par(mfrow=c(1,1))
   CreateOutliersPlot(FPCAdense_ML, optns = list(K = 15, variant = 'KDE'))
 ```
 
-
+    Similar to medial-lateral ground reaction forces,  we can make the dimension reduction to our data, from 100 data points to 8 functional principal components for vertical ground reaction force .Based on the scree-plot we see that the first three components appear to encapsulate most of the relevant variation. The number of principal components to reach a 99% fraction of variance explained is 8 but just 4 principal components are enough to reach a 95.0%.
+    
 ```{r}
 L_V <- MakeFPCAInputs(v_fpca$new, v_fpca$t, v_fpca$force)
 FPCAdense_V <- FPCA(L_V$Ly, L_V$Lt)
@@ -226,7 +260,13 @@ par(mfrow=c(1,1))
 ```
 
 
+## Reconstruction with functional PCA principle components. 
+```{r}
+
+```
+
 ##Tradictional auto-encoder
+
 
     We created 2 functions to help us. The first one gets descriptive statistics about the dataset that are used for scaling. Then we have a function to perform the min-max scaling.
 
@@ -372,3 +412,9 @@ Results:
 
 Discussion
 
+
+
+Citataion
+$1.$ Wikimedia Foundation. (2021, October 27). Functional principal component analysis. Wikipedia. Retrieved May 4, 2022, from             https://en.wikipedia.org/wiki/Functional_principal_component_analysis 
+$2.$ Shang, H. L. (2013). A survey of functional principal component analysis. AStA Advances in Statistical Analysis, 98(2), 121–142. https://doi.org/10.1007/s10182-013-0213-1 
+$3.$Functional PCA in R. (2021, October 1). Retrieved May 4, 2022, from https://cran.r-project.org/web/packages/fdapace/vignettes/fdapaceVig.html 
