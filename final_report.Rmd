@@ -161,10 +161,7 @@ ml_outlier_id <- ml_ms$outliers
 
 ml_grf <- ML_GRF_stance_N %>%
   mutate(index = row_number())
-```
 
-
-```{r}
 # label the outliers
 
 for (i in 1:nrow(ml_grf)) {
@@ -179,7 +176,10 @@ for (i in 1:nrow(ml_grf)) {
 ml_grf <- ml_grf[c(102, 1:100)]
 
 
+```
 
+
+```{r}
 v_ms <- msplot(dts = V_GRF_stance_N, plot = T)
 
 v_outlier_id <- v_ms$outliers
@@ -265,6 +265,9 @@ par(mfrow=c(1,1))
 
 ```
 
+
+
+
 ##Tradictional auto-encoder
 
 
@@ -298,9 +301,11 @@ Select ML_GRF_stance_N as example
 
 K <- keras::backend()
 
+set.seed(1234212)
+
 dt.ml <-  sort(sample(nrow(ml_grf), nrow(ml_grf)*.7))
-df_train.ml<-ml_grf[dt.ap,]
-df_test.ml<-ml_grf[-dt.ap,]
+df_train.ml<-ml_grf[dt.ml,]
+df_test.ml<-ml_grf[-dt.ml,]
 
 
 desc <- df_train.ml %>% 
