@@ -362,7 +362,7 @@ checkpoint <- callback_model_checkpoint(
 
 early_stopping <- callback_early_stopping(patience = 5)
 
-model_ml %>% fit(
+history3 <- model_ml %>% fit(
   x = x_train.ml[y_train.ml == 0,], 
   y = x_train.ml[y_train.ml == 0,], 
   epochs = 100, 
@@ -370,6 +370,8 @@ model_ml %>% fit(
   validation_data = list(x_test.ml[y_test.ml == 0,], x_test.ml[y_test.ml == 0,]), 
   callbacks = list(checkpoint, early_stopping)
 )
+
+plot(history3)
 
 loss <- evaluate(model_ml, x = x_test.ml[y_test.ml == 0,], y = x_test.ml[y_test.ml == 0,])
 loss
